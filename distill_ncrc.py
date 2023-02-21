@@ -53,11 +53,11 @@ num_epochs = 250
 # Generators
 #pose2id,labels,partition = PreProcessing_ncrc_losocv.preprocess_losocv(8)
 pose2id, labels, partition = PreProcessing_ncrc.preprocess()
+print(len(pose2id))
 
 print("Creating Data Generators...")
 mocap_frames = 600
 acc_frames = 150
-
 training_set = Poses3d_Dataset( data='ncrc',list_IDs=partition['train'], labels=labels, pose2id=pose2id, mocap_frames=mocap_frames, acc_frames=acc_frames, normalize=False)
 training_generator = torch.utils.data.DataLoader(training_set, **params) #Each produced sample is  200 x 59 x 3
 
@@ -101,12 +101,12 @@ minimizer = ASAM(optimizer, student_model, rho=rho, eta=eta)
 
 
 
-def train(epoch, num_epochs, student_model, teacher_model, loss_fn):
+def train(epoch, num_epochs, student_model, teacher_model, loss_fn, best_accuracy):
     teacher_model.eval()
     with tqdm(total  = len(training_generator), desc = f'Epoch {epoch+1}/{num_epochs}',ncols = 128) as pbar:
         # Train
         student_model.train()
-        loss = 0.
+        train_loss = 0.
         accuracy = 0.
         cnt = 0.
         for inputs, acc_input, targets in training_generator:
@@ -132,14 +132,21 @@ def train(epoch, num_epochs, student_model, teacher_model, loss_fn):
             minimizer.descent_step()
 
             with torch.no_grad():
-                loss += loss.sum().item()
+                train_loss += loss.sum().item()
+                # print(loss)
+                # print(type(loss))
                 accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
             cnt += len(targets)
-        loss /= cnt
+
+            temp_loss = train_loss / cnt
+            temp_acc = (accuracy * 100) / cnt
+
+            pbar.update(1)
+            pbar.set_postfix({'train_loss' : temp_loss, 'train_acc' : temp_acc})
+            
+        train_loss /= cnt
         accuracy *= 100. / cnt
-        pbar.update(1)
-        pbar.set_postfix({'train_loss' : loss, 'train_acc' : accuracy})
-        epoch_loss_train.append(loss)
+        epoch_loss_train.append(train_loss)
         epoch_acc_train.append(accuracy)
 
         #Val
@@ -156,10 +163,10 @@ def train(epoch, num_epochs, student_model, teacher_model, loss_fn):
                 targets = targets.to(device)
                 
                 predictions = student_model(inputs.float())
-                val_loss = F.cross_entropy(predictions, targets)
+                loss_score = F.cross_entropy(predictions, targets)
                 
                 with torch.no_grad():
-                    val_loss += val_loss.sum().item()
+                    val_loss += loss_score.sum().item()
                     val_accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
                 cnt += len(targets)
             val_loss /= cnt
@@ -171,7 +178,7 @@ def train(epoch, num_epochs, student_model, teacher_model, loss_fn):
                 torch.save(student_model.state_dict(),PATH+exp+'_best_ckpt.pt'); 
                 print("Check point "+PATH+exp+'_best_ckpt.pt'+ ' Saved!')
 
-        print(f"Epoch: {epoch},Val accuracy:  {val_acc:6.2f} %, Val loss:  {val_loss:8.5f}%")
+        print(f"Epoch: {epoch},Val accuracy:  {val_accuracy:6.2f} %, Val loss:  {val_loss:8.5f}%")
 
 
         epoch_loss_val.append(val_loss)
@@ -187,7 +194,7 @@ def train(epoch, num_epochs, student_model, teacher_model, loss_fn):
 
 
 if __name__ == "__main__":
-    max_epoch = 10
+    max_epoch = 100
     best_accuracy = 0 
     epoch_loss_train=[]
     epoch_loss_val=[]
@@ -196,4 +203,4 @@ if __name__ == "__main__":
     teacher_model.load_state_dict(torch.load('weights/model_crossview_fusion.pt'))
     
     for epoch in range(1,max_epoch+1): 
-        train(epoch, max_epoch, student_model, teacher_model, distillation)
+        train(epoch, max_epoch, student_model, teacher_model, distillation, best_accuracy)
