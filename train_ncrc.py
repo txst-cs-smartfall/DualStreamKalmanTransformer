@@ -133,7 +133,6 @@ for epoch in range(max_epochs):
             targets = targets.to(device)
             
             predictions = model(inputs.float())
-            
             with torch.no_grad():
                 loss += batch_loss.sum().item()
                 accuracy += (torch.argmax(predictions, 1) == targets).sum().item()

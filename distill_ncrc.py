@@ -139,10 +139,10 @@ def train(epoch, num_epochs, student_model, teacher_model, loss_fn):
         epoch_loss_train.append(loss)
         epoch_acc_train.append(accuracy)
 
-        #Test
+        #Val
         student_model.eval()
-        loss = 0.
-        accuracy = 0.
+        val_loss = 0.
+        val_accuracy = 0.
         cnt = 0.
         student_model=student_model.to(device)
         with torch.no_grad():
@@ -153,24 +153,26 @@ def train(epoch, num_epochs, student_model, teacher_model, loss_fn):
                 targets = targets.to(device)
                 
                 predictions = student_model(acc_input.float())
+                val_loss = F.cross_entropy(prediction, targets)
                 
                 with torch.no_grad():
-                    loss += batch_loss.sum().item()
-                    accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
+                    val_loss += val_loss.sum().item()
+                    val_accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
                 cnt += len(targets)
-            loss /= cnt
+            val_loss /= cnt
             accuracy *= 100. / cnt
             
         
-            if best_accuracy < accuracy:
-                best_accuracy = accuracy
-                torch.save(model.state_dict(),PATH+exp+'_best_ckpt.pt'); print("Check point "+PATH+exp+'_best_ckpt.pt'+ ' Saved!')
+            if best_accuracy < val_accuracy:
+                best_accuracy = val_accuracy
+                torch.save(student_model.state_dict(),PATH+exp+'_best_ckpt.pt'); 
+                print("Check point "+PATH+exp+'_best_ckpt.pt'+ ' Saved!')
 
-        print(f"Epoch: {epoch},Test accuracy:  {accuracy:6.2f} %, Test loss:  {loss:8.5f}")
+        print(f"Epoch: {epoch},Val accuracy:  {val_accuracy:6.2f} %, Val loss:  {val_loss):8.5f}")
 
 
-        epoch_loss_val.append(loss)
-        epoch_acc_val.append(accuracy)
+        epoch_loss_val.append(val_loss)
+        epoch_acc_val.append(val_accuracy)
 
 
 # print(f"Best test accuracy: {best_accuracy}")
