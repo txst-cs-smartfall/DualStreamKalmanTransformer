@@ -227,8 +227,8 @@ class Poses3d_Dataset(torch.utils.data.Dataset):
             
             
             #Extrat segment ids
-            segment_id = mocap_info.pop()
-            segment_id = acc_info.pop()
+            segment_id = mocap_info[-1]
+            segment_id = acc_info[-1]
             
             mocap_sig = torch.tensor( self.read_mocap_segment( mocap_info[0] ) ) #600 x 29 x 3
             acc_sig = torch.tensor( self.read_acc_segment( acc_info[0] , segment_id ) ) #acc_frames x 3

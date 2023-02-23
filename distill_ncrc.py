@@ -53,7 +53,6 @@ num_epochs = 250
 # Generators
 #pose2id,labels,partition = PreProcessing_ncrc_losocv.preprocess_losocv(8)
 pose2id, labels, partition = PreProcessing_ncrc.preprocess()
-print(len(pose2id))
 
 print("Creating Data Generators...")
 mocap_frames = 600
