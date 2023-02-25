@@ -77,14 +77,7 @@ print("-----------TRAINING PARAMS----------")
 lr=0.0025
 wt_decay=5e-4
 
-#Optimizer
-optimizer = torch.optim.SGD(student_model.parameters(), lr=lr, momentum=0.9,weight_decay=wt_decay)
-#optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wt_decay)
 
-#ASAM
-rho=0.5
-eta=0.01
-minimizer = ASAM(optimizer, student_model, rho=rho, eta=eta)
 
 #Learning Rate Scheduler
 #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(minimizer.optimizer,(num_epochs)
@@ -193,13 +186,23 @@ def train(epoch, num_epochs, student_model, teacher_model, loss_fn, best_accurac
 
 
 if __name__ == "__main__":
-    max_epoch = 100
+    max_epoch = 150
     best_accuracy = 0 
     epoch_loss_train=[]
     epoch_loss_val=[]
     epoch_acc_train=[]
     epoch_acc_val=[]
     teacher_model.load_state_dict(torch.load('weights/model_crossview_fusion.pt'))
+    student_model.load_state_dict(torch.load('exps/myexp-1/myexp-1_best_ckpt.pt'))
+    #Optimizer
+    optimizer = torch.optim.SGD(student_model.parameters(), lr=lr, momentum=0.9,weight_decay=wt_decay)
+    #optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wt_decay)
+
+    #ASAM
+    rho=0.5
+    eta=0.01
+    minimizer = ASAM(optimizer, student_model, rho=rho, eta=eta)
     
     for epoch in range(1,max_epoch+1): 
+        print(best_accuracy)
         train(epoch, max_epoch, student_model, teacher_model, distillation, best_accuracy)
