@@ -300,6 +300,8 @@ class ActTransformerMM(nn.Module):
         
         #Concat features along frame dimension
         x += sx #torch.cat((x,sx), dim=1)
+        print(f'fusion shape: {x.shape}')
+
         x = self.class_head(x)
 
         return F.log_softmax(x,dim=1)
