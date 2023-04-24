@@ -11,6 +11,7 @@ import torch.nn.functional as F
 import pickle
 from asam import ASAM, SAM
 from timm.loss import LabelSmoothingCrossEntropy
+from loss import SemanticLoss
 import os
 
 
@@ -29,18 +30,7 @@ print(use_cuda)
 device = torch.device("cuda:0" if use_cuda else "cpu")
 torch.backends.cudnn.benchmark = True
 
-# KDL loss function 
-def distillation(y, labels, teacher_scores, T, alpha):
-    # Implementing alpha * Temp ^2 * crossEn(Q_s, Q_t) + (1-alpha)* crossEn(Q_s, y_true)
-    pred_soft = F.log_softmax(y/T, dim = 1)
-    # print(f'Student pred has Nan : {torch.isnan(pred_soft).any()}')
-    teacher_scores_soft = F.log_softmax(teacher_scores/T, dim = 1)
-    # print(f'Teacher pred has Nan : {torch.isnan(teacher_scores_soft).any()}')
-    kl_div = nn.KLDivLoss(reduction= "batchmean", log_target=True)(pred_soft, teacher_scores_soft) * ( alpha * T * T * 2.0)
-    # print(f'KlDiv pred has Nan : {torch.isnan(kl_div).any()}')
-    loss_y_label = F.cross_entropy(y, labels) * (1.0 - alpha)
-    # print(f'Y loss has Nan : {torch.isnan(loss_y_label).any()}')
-    return kl_div + loss_y_label
+
 
 # Parameters
 print("Creating params....")
@@ -72,7 +62,8 @@ teacher_model.cuda()
 student_model.cuda()
 
 
-print("-----------TRAINING PARAMS----------")
+
+
 #Define loss and optimizer
 lr=0.0025
 wt_decay=5e-4
@@ -93,8 +84,16 @@ wt_decay=5e-4
 
 
 
-def train(epoch, num_epochs, student_model, teacher_model, loss_fn, best_accuracy):
+def train(epoch, num_epochs, student_model, teacher_model, best_accuracy):
+    total_params = 0
+    print("-----------TRAINING PARAMS----------")
+    for name , params in student_model.named_parameters():
+        total_params += params.numel()
+        print(f'Layer {name} | Size: {params.size()} | Params: {params.numel()}')
+    print(f'Total parameter: {total_params}')
+
     teacher_model.eval()
+    criterion = SemanticLoss()
     with tqdm(total  = len(training_generator), desc = f'Epoch {epoch}/{num_epochs}',ncols = 128) as pbar:
         # Train
         student_model.train()
@@ -115,12 +114,12 @@ def train(epoch, num_epochs, student_model, teacher_model, loss_fn, best_accurac
             # detached_pred = predictions.detach()
             # teacher_output = teacher_output.detach()
             #print("predictions: ",torch.argmax(predictions, 1) )
-            loss = loss_fn(predictions, targets, teacher_output, T=2.0, alpha = 0.7)
+            loss = criterion(predictions, targets, teacher_output, T=2.0, alpha = 0.7)
             loss.mean().backward()
             minimizer.ascent_step()
 
             # Descent Step
-            loss_fn(student_model(inputs.float()), targets, teacher_model(inputs.float()), T=2.0, alpha = 0.7).mean().backward()
+            criterion(student_model(inputs.float()), targets, teacher_model(inputs.float()), T=2.0, alpha = 0.7).mean().backward()
             minimizer.descent_step()
 
             with torch.no_grad():
@@ -166,6 +165,7 @@ def train(epoch, num_epochs, student_model, teacher_model, loss_fn, best_accurac
             
         print(f"\n Epoch: {epoch},Val accuracy:  {val_accuracy:6.2f} %, Val loss:  {val_loss:8.5f}%")
         if best_accuracy < val_accuracy:
+                print(best_accuracy)
                 best_accuracy = val_accuracy
                 torch.save(student_model.state_dict(),PATH+exp+'_best_ckpt.pt'); 
                 print("Check point "+PATH+exp+'_best_ckpt.pt'+ ' Saved!')
@@ -177,6 +177,7 @@ def train(epoch, num_epochs, student_model, teacher_model, loss_fn, best_accurac
         epoch_acc_val.append(val_accuracy)
 
 
+
 # print(f"Best test accuracy: {best_accuracy}")
 # print("TRAINING COMPLETED :)")
 
@@ -186,14 +187,13 @@ def train(epoch, num_epochs, student_model, teacher_model, loss_fn, best_accurac
 
 
 if __name__ == "__main__":
-    max_epoch = 150
+    max_epoch = 250
     best_accuracy = 0 
     epoch_loss_train=[]
     epoch_loss_val=[]
     epoch_acc_train=[]
     epoch_acc_val=[]
     teacher_model.load_state_dict(torch.load('weights/model_crossview_fusion.pt'))
-    student_model.load_state_dict(torch.load('exps/myexp-1/myexp-1_best_ckpt.pt'))
     #Optimizer
     optimizer = torch.optim.SGD(student_model.parameters(), lr=lr, momentum=0.9,weight_decay=wt_decay)
     #optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wt_decay)
@@ -203,6 +203,11 @@ if __name__ == "__main__":
     eta=0.01
     minimizer = ASAM(optimizer, student_model, rho=rho, eta=eta)
     
+    best_accuracy = 0
+     
+    #criterion selection using arguements
+
     for epoch in range(1,max_epoch+1): 
+        train(epoch, max_epoch, student_model, teacher_model,  best_accuracy = best_accuracy )
+        best_accuracy = epoch_acc_val[epoch - 1]
         print(best_accuracy)
-        train(epoch, max_epoch, student_model, teacher_model, distillation, best_accuracy)

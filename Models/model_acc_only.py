@@ -152,9 +152,10 @@ class ActTransformerAcc(nn.Module):
 
         #Concat features along frame dimension
         print(f'Accelerometer shape {sx.shape}')
-        sx = self.class_head(sx)
+        out = sx
+        logits = self.class_head(sx)
 
-        return sx, F.log_softmax(sx,dim=1)
+        return out, logits, F.log_softmax(sx,dim=1)
 
 '''
 model=ActRecogTransformer()

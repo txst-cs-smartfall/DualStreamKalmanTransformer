@@ -266,8 +266,9 @@ class ActRecogTransformer(nn.Module):
 
         #Concat features along frame dimension
         x = torch.cat((x,sx),dim=1) #x += sx 
-        x = self.class_head(x)
+        out = x
+        logits = self.class_head(x)
 
-        return F.log_softmax(x,dim=1)
+        return out, logits, F.log_softmax(x,dim=1)
 
 
