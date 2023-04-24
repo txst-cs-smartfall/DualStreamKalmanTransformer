@@ -91,27 +91,25 @@ def train(epoch, num_epochs, student_model, teacher_model, criterion, best_accur
         student_model.train()
         train_loss = 0.
         accuracy = 0.
+        teacher_accuracy = 0.
         cnt = 0.
         alpha = 0.7
         T = 2.0
         for inputs, acc_input, targets in training_generator:
             # Transfering the input, targets to the GPU
-            inputs = inputs.to(device); #print("Input batch: ",inputs)
+            inputs = inputs.to(device)
             targets = targets.to(device)
             acc_input = acc_input.to(device)
 
 
             optimizer.zero_grad()
 
-            # Ascent Step
-            #print("labels: ",targets)
-
             #Prediction step
             out, student_logits,student_pred = student_model(inputs.float())
             teacher_out, teacher_logits, teacher_pred = teacher_model(inputs.float())
-            # detached_pred = predictions.detach()
-            # teacher_output = teacher_output.detach()
-            #print("predictions: ",torch.argmax(predictions, 1) )
+            # print(f'\nStudent logit shape: {student_logits.shape}')
+            # print(f'\nTeacher logit shape: {teacher_logits.shape}')
+
             loss = criterion(student_logits, targets, teacher_logits, T, alpha)
             loss.mean().backward()
             minimizer.ascent_step()
@@ -127,14 +125,15 @@ def train(epoch, num_epochs, student_model, teacher_model, criterion, best_accur
                 train_loss += loss.sum().item()
                 # print(loss)
                 # print(type(loss))
-                accuracy += (torch.argmax(des_stud_pred, 1) == targets).sum().item()
+                accuracy += (torch.argmax(student_pred, 1) == targets).sum().item()
+                teacher_accuracy += (torch.argmax(teacher_pred, 1) == targets).sum().item()
             cnt += len(targets)
 
             temp_loss = train_loss / cnt
             temp_acc = (accuracy * 100) / cnt
-
+            temp_teach_acc = (teacher_accuracy * 100) / cnt
             pbar.update(1)
-            pbar.set_postfix({'train_loss' : temp_loss, 'train_acc' : temp_acc})
+            pbar.set_postfix({'train_loss' : temp_loss, 'train_acc' : temp_acc, 'teacher_acc': temp_teach_acc})
             
         train_loss /= cnt
         accuracy *= 100. / cnt

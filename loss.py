@@ -43,11 +43,29 @@ class SemanticLoss(nn.Module):
         loss = F.smooth_l1_loss(s_angle, t_angle, reduction='mean')
         return loss
     
+    def distance(self,student, teacher):
+        with torch.no_grad():
+            td = (teacher.unsqueeze(0) - teacher.unsqueeze(1))
+            norm_td = F.normalize(td, p=2, dim=2)
+            t_angle = torch.bmm(norm_td, norm_td.transpose(1, 2)).view(-1)
+	
+		#flatenning the prediction
+        sd = (student.unsqueeze(0) - student.unsqueeze(1))
+        norm_sd = F.normalize(sd, p=2, dim=2)
+		# computing angular correlation between the norm_sd
+        s_angle = torch.bmm(norm_sd, norm_sd.transpose(1, 2)).view(-1)
+
+        loss = F.smooth_l1_loss(s_angle, t_angle, reduction='mean')
+        return loss
+
     def forward(self,student_pred, labels, teacher_pred, T, alpha):
+        gamma = 0.1
+        beta = 0.2
         kd_loss = self.distillation_loss(student_pred, labels, teacher_pred, T, alpha)
         angular_loss = self.angular_dist(student_pred, teacher_pred)
+        dist_loss = self.distance(student_pred, teacher_pred)
 
-        loss = kd_loss + angular_loss
+        loss = kd_loss + (beta*angular_loss) + (gamma*dist_loss)
 
         return loss
     
