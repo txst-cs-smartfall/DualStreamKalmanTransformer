@@ -65,7 +65,8 @@ student_model.cuda()
 
 
 #Define loss and optimizer
-lr=0.0025
+#Learning rate decay 
+lr=0.005
 wt_decay=5e-4
 
 
@@ -123,8 +124,6 @@ def train(epoch, num_epochs, student_model, teacher_model, criterion, best_accur
 
             with torch.no_grad():
                 train_loss += loss.sum().item()
-                # print(loss)
-                # print(type(loss))
                 accuracy += (torch.argmax(student_pred, 1) == targets).sum().item()
                 teacher_accuracy += (torch.argmax(teacher_pred, 1) == targets).sum().item()
             cnt += len(targets)
@@ -185,7 +184,7 @@ if __name__ == "__main__":
     epoch_acc_val=[]
     teacher_model.load_state_dict(torch.load('weights/model_crossview_fusion.pt'))
     #Optimizer
-    optimizer = torch.optim.SGD(student_model.parameters(), lr=lr, momentum=0.9,weight_decay=wt_decay)
+    optimizer = torch.optim.Adam(student_model.parameters(), lr=lr,weight_decay=wt_decay)
     #optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wt_decay)
 
     #ASAM
