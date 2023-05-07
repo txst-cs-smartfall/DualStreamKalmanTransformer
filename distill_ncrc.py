@@ -43,15 +43,15 @@ num_epochs = 250
 
 # Generators
 #pose2id,labels,partition = PreProcessing_ncrc_losocv.preprocess_losocv(8)
-pose2id, labels, partition = PreProcessing_ncrc.preprocess()
+tr_pose2id,tr_labels,valid_pose2id,valid_labels,pose2id,labels,partition = PreProcessing_ncrc.preprocess()
 
 print("Creating Data Generators...")
 mocap_frames = 600
 acc_frames = 150
-training_set = Poses3d_Dataset( data='ncrc',list_IDs=partition['train'], labels=labels, pose2id=pose2id, mocap_frames=mocap_frames, acc_frames=acc_frames, normalize=False)
+training_set = Poses3d_Dataset( data='ncrc',list_IDs=partition['train'], labels=tr_labels, pose2id=tr_pose2id, mocap_frames=mocap_frames, acc_frames=acc_frames, normalize=False)
 training_generator = torch.utils.data.DataLoader(training_set, **params) #Each produced sample is  200 x 59 x 3
 
-validation_set = Poses3d_Dataset(data='ncrc',list_IDs=partition['test'], labels=labels, pose2id=pose2id, mocap_frames=mocap_frames, acc_frames=acc_frames ,normalize=False)
+validation_set = Poses3d_Dataset(data='ncrc',list_IDs=partition['valid'], labels=valid_labels, pose2id=valid_pose2id, mocap_frames=mocap_frames, acc_frames=acc_frames ,normalize=False)
 validation_generator = torch.utils.data.DataLoader(validation_set, **params) #Each produced sample is 6000 x 229 x 3
 
 #Define model
@@ -88,7 +88,7 @@ wt_decay=5e-4
 
 def train(epoch, num_epochs, student_model, teacher_model, criterion, best_accuracy):
     teacher_model.eval()
-    scheduler = ReduceLROnPlateau(optimizer, 'max', verbose = True, patience = 2)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', verbose = True, patience = 2)
     with tqdm(total  = len(training_generator), desc = f'Epoch {epoch}/{num_epochs}',ncols = 128) as pbar:
         # Train
         student_model.train()
@@ -99,12 +99,10 @@ def train(epoch, num_epochs, student_model, teacher_model, criterion, best_accur
         alpha = 0.7
         T = 2.0
         for inputs, acc_input, targets in training_generator:
-            # Transfering the input, targets to the GPU
-            inputs = inputs.to(device)
+            # Transfering the input, targets to the GPU]
+            inputs = inputs.to(device) #[batch_size X ]
             targets = targets.to(device)
             acc_input = acc_input.to(device)
-
-
             optimizer.zero_grad()
 
             #Prediction step
@@ -163,13 +161,13 @@ def train(epoch, num_epochs, student_model, teacher_model, criterion, best_accur
                 cnt += len(targets)
             val_loss /= cnt
             val_accuracy *= 100. / cnt
-        scheduler.step(train_loss)
+        scheduler.step(val_loss)
         print(f"\n Epoch: {epoch},Val accuracy:  {val_accuracy:6.2f} %, Val loss:  {val_loss:8.5f}%")
         if best_accuracy < val_accuracy:
                 best_accuracy = val_accuracy
                 #need to add arguements here also for different experiments
-                torch.save(student_model.state_dict(),PATH+exp+'_best_ckpt.pt'); 
-                print("Check point "+PATH+exp+'_best_ckpt.pt'+ ' Saved!')
+                torch.save(student_model.state_dict(),PATH+exp+'_best_ckpt_wnodistance.pt'); 
+                print("Check point "+PATH+exp+'_best_ckpt_wnodistance.pt'+ ' Saved!')
 
 
         epoch_loss_val.append(val_loss)
@@ -185,7 +183,6 @@ if __name__ == "__main__":
     epoch_acc_train=[]
     epoch_acc_val=[]
     teacher_model.load_state_dict(torch.load('weights/model_crossview_fusion.pt'))
-    student_model.load_state_dict(torch.load('exps/myexp-1/myexp-1_best_ckpt.pt'))
     #Optimizer
     optimizer = torch.optim.Adam(student_model.parameters(), lr=lr,weight_decay=wt_decay)
 
@@ -205,8 +202,8 @@ if __name__ == "__main__":
         total_params += params.numel()
         print(f'Layer {name} | Size: {params.size()} | Params: {params.numel()}')
     print(f'Total parameter: {total_params}')
-
+    
     for epoch in range(1,max_epoch+1): 
+        print(optimizer.param_groups[0]['lr'])
         train(epoch, max_epoch, student_model, teacher_model,criterion,  best_accuracy = best_accuracy )
         best_accuracy = epoch_acc_val[epoch - 1]
-        print(best_accuracy)

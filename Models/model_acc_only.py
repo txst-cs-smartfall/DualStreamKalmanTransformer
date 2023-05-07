@@ -133,14 +133,15 @@ class ActTransformerAcc(nn.Module):
 
     def forward(self, inputs):
         #Input: B x MOCAP_FRAMES X  119 x 3
-        b,_,_,c = inputs.shape
+        b,_,_,c = inputs.shape #[8 X 600 X 197 X 4]
 
         #Extract skeletal signal from input
         x = inputs[:,:, :self.num_joints, :self.joint_coords] #B x Fs x num_joints x 3
-
+        # print(f'\n Input before accelerometer {x.shape}')
         #Extract acc signal from input
         sxf = inputs[:, 0, self.num_joints:self.num_joints+self.acc_features, 0 ] #B x 1 x acc_features x 1
         sx = inputs[:, 0 , self.num_joints+self.acc_features:, :self.acc_coords] #B x 1 x Fa x 3
+        # print(f'\n Only accelerometer input {sx.shape}')
         sx = torch.reshape(sx, (b,-1,1,self.acc_coords) ) #B x Fa x 1 x 3
 
 
@@ -153,6 +154,8 @@ class ActTransformerAcc(nn.Module):
         #Concat features along frame dimension
         out = sx
         logits = self.class_head(sx)
+        # print(logits)
+        # print(F.log_softmax(logits,dim=1))
         return out, logits, F.log_softmax(logits,dim=1)
 
 '''

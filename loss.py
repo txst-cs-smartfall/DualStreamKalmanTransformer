@@ -62,10 +62,10 @@ class SemanticLoss(nn.Module):
         gamma = 0.1
         beta = 0.2
         kd_loss = self.distillation_loss(student_pred, labels, teacher_pred, T, alpha)
-        angular_loss = self.angular_dist(student_pred, teacher_pred)
-        dist_loss = self.distance(student_pred, teacher_pred)
+        # angular_loss = self.angular_dist(student_pred, teacher_pred)
+        # dist_loss = self.distance(student_pred, teacher_pred)
 
-        loss = kd_loss + (beta*angular_loss) + (gamma*dist_loss)
+        # loss = kd_loss + (beta*angular_loss) + (gamma*dist_loss)
 
-        return loss
+        return kd_loss
     

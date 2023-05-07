@@ -80,35 +80,38 @@ def preprocess():
     mocap_train_path=cfg.file_paths['mocap_train_path']
     #'mocap_train_path': '/Users/tousif/KD_torch/MMT_for_NCRC/data/train/mocap/
     mocap_test_path=cfg.file_paths['mocap_test_path']
+    mocap_valid_path = cfg.file_paths['mocap_valid_path']
 
     acc_train_path=cfg.file_paths['acc_train_path']
+    acc_valid_path = cfg.file_paths['acc_valid_path']
     #'acc_train_path':'/Users/tousif/KD_torch/MMT_for_NCRC/data/train/accelerometer_train.csv',
     acc_test_path=cfg.file_paths['acc_test_path']
 
     tr_labels_path=cfg.file_paths['tr_labels_path']
-    #'tr_labels_path':'/Users/tousif/KD_torch/MMT_for_NCRC/data/train/activities_train.csv',
+    valid_labels_path = cfg.file_paths['valid_labels_path']
     tst_labels_path=cfg.file_paths['tst_labels_path']
+    #'tr_labels_pat':'/Users/tousif/KD_torch/MMT_for_NCRC/data/train/activities_train.csv',
+    
 
     aug_path=None
 
     tr_pose2id,tr_labels,start_i = pose2idlabel([mocap_train_path,acc_train_path],tr_labels_path,aug_path)
-    pose2id,labels,_ = pose2idlabel([mocap_test_path,acc_test_path],tst_labels_path,aug_path,start_i)
+    valid_pose2id,valid_labels,start_test = pose2idlabel([mocap_valid_path,acc_valid_path],valid_labels_path,aug_path)
+    pose2id,labels,_ = pose2idlabel([mocap_test_path,acc_test_path],tst_labels_path,aug_path,start_test)
 
     # For Training #CREATE TEST AND TRAIN IDS
     partition=dict()
     partition['train']=list(tr_pose2id.keys())
+    partition['valid'] = list(valid_pose2id.keys())
     partition['test']=list(pose2id.keys())
     print('--------------DATA SPLIT----------')
     print("Train Sample: ",len(tr_pose2id))
+    print("Valid Sample:", len(valid_pose2id))
     print("Test Samples: ",len(pose2id))
+    
 
-    #Merge the labels and pose dictionary
-    pose2id.update(tr_pose2id)
-    labels.update(tr_labels)
-
-    #print("Partition: ",labels)
     print("Partitions are  Made!" )
-    return pose2id,labels,partition
+    return tr_pose2id,tr_labels,valid_pose2id,valid_labels,pose2id,labels,partition
 
 
 
