@@ -86,9 +86,8 @@ wt_decay=5e-4
 
 
 
-def train(epoch, num_epochs, student_model, teacher_model, criterion, best_accuracy):
+def train(epoch, num_epochs, student_model, teacher_model, criterion, best_accuracy, lr_scheduler):
     teacher_model.eval()
-    scheduler = ReduceLROnPlateau(optimizer, 'min', verbose = True, patience = 2)
     with tqdm(total  = len(training_generator), desc = f'Epoch {epoch}/{num_epochs}',ncols = 128) as pbar:
         # Train
         student_model.train()
@@ -141,8 +140,9 @@ def train(epoch, num_epochs, student_model, teacher_model, criterion, best_accur
 
         #Val
         student_model.eval()
-        val_loss = 0.
-        val_accuracy = 0.
+        val_loss = 0
+        val_accuracy = 0
+        val_t_accuracy = 0
         cnt = 0.
         student_model=student_model.to(device)
         with torch.no_grad():
@@ -153,20 +153,23 @@ def train(epoch, num_epochs, student_model, teacher_model, criterion, best_accur
                 targets = targets.to(device)
                 
                 out, student_logits,predictions = student_model(inputs.float())
+                teacher_out, teacher_logits, teacher_pred = teacher_model(inputs.float())
                 loss_score = F.cross_entropy(predictions, targets)
                 
                 with torch.no_grad():
                     val_loss += loss_score.sum().item()
                     val_accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
+                    val_t_accuracy += (torch.argmax(teacher_pred, 1) == targets).sum().item()
                 cnt += len(targets)
             val_loss /= cnt
             val_accuracy *= 100. / cnt
-        scheduler.step(val_loss)
-        print(f"\n Epoch: {epoch},Val accuracy:  {val_accuracy:6.2f} %, Val loss:  {val_loss:8.5f}%")
+            val_t_accuracy *= 100./ cnt
+        lr_scheduler.step(val_loss)
+        print(f"\n Epoch: {epoch},Val accuracy:  {val_accuracy:6.2f} %, Val loss:  {val_loss:8.5f}% , Val_teach: {val_t_accuracy:8.5f}%")
         if best_accuracy < val_accuracy:
                 best_accuracy = val_accuracy
                 #need to add arguements here also for different experiments
-                torch.save(student_model.state_dict(),PATH+exp+'_best_ckpt_wnodistance.pt'); 
+                torch.save(student_model.state_dict(),PATH+exp+'_best_ckpt_wdistance.pt'); 
                 print("Check point "+PATH+exp+'_best_ckpt_wnodistance.pt'+ ' Saved!')
 
 
@@ -195,6 +198,7 @@ if __name__ == "__main__":
     
     best_accuracy = 0
     criterion = SemanticLoss()
+    scheduler = ReduceLROnPlateau(optimizer, 'min', verbose = True, patience = 2)
     #criterion selection using arguements
     total_params = 0
     print("-----------TRAINING PARAMS----------")
@@ -205,5 +209,5 @@ if __name__ == "__main__":
     
     for epoch in range(1,max_epoch+1): 
         print(optimizer.param_groups[0]['lr'])
-        train(epoch, max_epoch, student_model, teacher_model,criterion,  best_accuracy = best_accuracy )
+        train(epoch, max_epoch, student_model, teacher_model,criterion,  best_accuracy = best_accuracy , lr_scheduler = scheduler )
         best_accuracy = epoch_acc_val[epoch - 1]
