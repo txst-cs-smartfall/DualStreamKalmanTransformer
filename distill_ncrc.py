@@ -67,7 +67,7 @@ student_model.cuda()
 
 #Define loss and optimizer
 #Learning rate decay 
-lr=0.005
+lr=0.05
 wt_decay=5e-4
 
 
@@ -179,7 +179,7 @@ def train(epoch, num_epochs, student_model, teacher_model, criterion, best_accur
 
 
 if __name__ == "__main__":
-    max_epoch = 250
+    max_epoch = 50
     best_accuracy = 0 
     epoch_loss_train=[]
     epoch_loss_val=[]
@@ -198,7 +198,7 @@ if __name__ == "__main__":
     
     best_accuracy = 0
     criterion = SemanticLoss()
-    scheduler = ReduceLROnPlateau(optimizer, 'min', verbose = True, patience = 2)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', verbose = True, patience = 4)
     #criterion selection using arguements
     total_params = 0
     print("-----------TRAINING PARAMS----------")
