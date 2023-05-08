@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from Make_Dataset import Poses3d_Dataset, Utd_Dataset
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import PreProcessing_ncrc
 from Models.model_crossview_fusion import ActTransformerMM
 # from Tools.visualize import get_plot
@@ -91,7 +92,8 @@ epoch_acc_val=[]
 #print("Loss: LSC ",smoothing)
 
 best_accuracy = 0.
-
+model.load_state_dict(torch.load('/home/bgu9/Fall_Detection_KD_Multimodal/exps/myexp-utd/myexp-utd_best_ckptutdmm.pt'))
+scheduler = ReduceLROnPlateau(optimizer, 'min', verbose = True, patience = 10)
 
 print("Begin Training....")
 for epoch in range(max_epochs):
@@ -134,7 +136,7 @@ for epoch in range(max_epochs):
     #accuracy,loss = validation(model,validation_generator)
     #Test
     model.eval()
-    loss = 0.
+    val_loss = 0.
     accuracy = 0.
     cnt = 0.
     model=model.to(device)
@@ -148,17 +150,17 @@ for epoch in range(max_epochs):
             
             _,_,predictions = model(inputs.float())
             with torch.no_grad():
-                loss += batch_loss.sum().item()
+                val_loss += batch_loss.sum().item()
                 accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
             cnt += len(targets)
-        loss /= cnt
+        val_loss /= cnt
         accuracy *= 100. / cnt
         
-    
+        scheduler.step(val_loss)
         if best_accuracy < accuracy:
             best_accuracy = accuracy
-            torch.save(model.state_dict(),PATH+exp+'_best_ckptutdmm.pt'); 
-            print("Check point "+PATH+exp+'_best_ckptutdmm.pt'+ ' Saved!')
+            torch.save(model.state_dict(),PATH+exp+'_best_ckptutdmm2.pt'); 
+            print("Check point "+PATH+exp+'_best_ckptutdmm2.pt'+ ' Saved!')
 
     print(f"Epoch: {epoch},Test accuracy:  {accuracy:6.2f} %, Test loss:  {loss:8.5f}")
 

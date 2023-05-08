@@ -16,7 +16,7 @@ from .model_utils import Block
 
 class ActTransformerAcc(nn.Module):
     def __init__(self, device, acc_frames=150, num_joints=29, in_chans=3, acc_coords=3, acc_embed=32, acc_features=18, adepth=4, num_heads=8, mlp_ratio=2., qkv_bias=True,
-                 qk_scale=None, op_type='cls', embed_type='lin', fuse_acc_features=False,
+                 qk_scale=None, op_type='cls', embed_type='lin', fuse_acc_features=False,has_features = False,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.2,  norm_layer=None, num_classes=6):
 
         """    ##########hybrid_backbone=None, representation_size=None,
@@ -69,6 +69,7 @@ class ActTransformerAcc(nn.Module):
         self.adepth = adepth
         self.acc_features = acc_features
         self.fuse_acc_features = fuse_acc_features
+        self.has_features = has_features
         self.acc_coords = acc_coords
 
         
@@ -85,7 +86,8 @@ class ActTransformerAcc(nn.Module):
         self.pos_drop = nn.Dropout(p=drop_rate)
 
         #Linear layer to extract features from the acc features signal
-        self.acc_features_embed = nn.Linear(acc_features,acc_embed)
+        if self.has_features:
+            self.acc_features_embed = nn.Linear(acc_features,acc_embed)
 
 
         #Classification head
@@ -139,15 +141,19 @@ class ActTransformerAcc(nn.Module):
         x = inputs[:,:, :self.num_joints, :self.joint_coords] #B x Fs x num_joints x 3
         # print(f'\n Input before accelerometer {x.shape}')
         #Extract acc signal from input
-        sxf = inputs[:, 0, self.num_joints:self.num_joints+self.acc_features, 0 ] #B x 1 x acc_features x 1
-        sx = inputs[:, 0 , self.num_joints+self.acc_features:, :self.acc_coords] #B x 1 x Fa x 3
+        if self.has_features:
+            sxf = inputs[:, 0, self.num_joints:self.num_joints+self.acc_features, 0 ] #B x 1 x acc_features x 1
+            sx = inputs[:, 0 , self.num_joints+self.acc_features:, :self.acc_coords] #B x 1 x Fa x 3
+            sxf = self.acc_features_embed(sxf)
         # print(f'\n Only accelerometer input {sx.shape}')
+        else: 
+            sx = inputs[:, 0 , self.num_joints:, :self.acc_coords]
         sx = torch.reshape(sx, (b,-1,1,self.acc_coords) ) #B x Fa x 1 x 3
 
 
         #Get acceleration features
         sx = self.Acc_forward_features(sx); #print("Input to ACC Transformer: ",sx) #in: F x Fa x 3 x 1,  op: B x St
-        sxf = self.acc_features_embed(sxf)
+        
         if self.fuse_acc_features:
             sx+= sxf #Add the features signal to acceleration signal
 

@@ -67,5 +67,6 @@ class SemanticLoss(nn.Module):
 
         loss = kd_loss + (beta*angular_loss) + (gamma*dist_loss)
 
+        # return kd_loss
         return loss
     

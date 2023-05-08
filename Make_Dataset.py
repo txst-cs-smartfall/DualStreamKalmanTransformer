@@ -274,7 +274,7 @@ class Poses3d_Dataset(torch.utils.data.Dataset):
             else:
                 X = data
             y = self.labels[ID]
-            return X, acc_ext, y
+            return X,  y
 
 class Utd_Dataset(torch.utils.data.Dataset):
     def __init__(self, npz_file):
@@ -292,7 +292,9 @@ class Utd_Dataset(torch.utils.data.Dataset):
         data = self.dataset[index, :, : , :]
         data = torch.tensor(data)
         label = self.labels[index]
+        label = label - 1
         label = torch.tensor(label)
+        label = label.long()
         return data, label
 
 
