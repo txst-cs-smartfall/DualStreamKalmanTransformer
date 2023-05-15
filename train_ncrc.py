@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import pandas as pd
 from Make_Dataset import Poses3d_Dataset, Utd_Dataset
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import PreProcessing_ncrc
@@ -42,6 +43,7 @@ num_joints = 20
 num_classes = 27
 
 if dataset == 'ncrc':
+    pose2id, labels, partition = PreProcessing_ncrc.preprocess()
     training_set = Poses3d_Dataset( data='ncrc',list_IDs=partition['train'], labels=tr_labels, pose2id=tr_pose2id, mocap_frames=mocap_frames, acc_frames=acc_frames, normalize=False)
     training_generator = torch.utils.data.DataLoader(training_set, **params) #Each produced sample is  200 x 59 x 3
 
@@ -49,10 +51,10 @@ if dataset == 'ncrc':
     validation_generator = torch.utils.data.DataLoader(validation_set, **params) #Each produced sample is 6000 x 229 x 3
 
 else:
-    training_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/train_data.npz')
+    training_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/randtrain_data.npz')
     training_generator = torch.utils.data.DataLoader(training_set, **params)
 
-    validation_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/valid_data.npz')
+    validation_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/randvalid_data.npz')
     validation_generator = torch.utils.data.DataLoader(validation_set, **params)
 
 
@@ -94,7 +96,7 @@ epoch_acc_val=[]
 #print("Loss: LSC ",smoothing)
 
 best_accuracy = 0.
-model.load_state_dict(torch.load('/home/bgu9/Fall_Detection_KD_Multimodal/exps/myexp-utd/myexp-utd_best_ckptutdmm.pt'))
+# model.load_state_dict(torch.load('/home/bgu9/Fall_Detection_KD_Multimodal/exps/myexp-utd/myexp-utd_best_ckptutdmm.pt'))
 # scheduler = ReduceLROnPlateau(optimizer, 'min', verbose = True, patience = 10)
 
 print("Begin Training....")
@@ -158,8 +160,8 @@ for epoch in range(max_epochs):
         
         if best_accuracy < accuracy:
             best_accuracy = accuracy
-            torch.save(model.state_dict(),PATH+exp+'_best_ckptafter70.pt'); 
-            print("Check point "+PATH+exp+'_best_ckptafter70.pt'+ ' Saved!')
+            torch.save(model.state_dict(),PATH+exp+'_best_ckpt200.pt'); 
+            print("Check point "+PATH+exp+'_best_ckpt200.pt'+ ' Saved!')
 
     print(f"Epoch: {epoch},Test accuracy:  {accuracy:6.2f} %, Test loss:  {loss:8.5f}")
 
@@ -169,6 +171,7 @@ for epoch in range(max_epochs):
 
 
 data_dict = {'train_accuracy': epoch_acc_train, 'train_loss':epoch_loss_train, 'val_acc': epoch_loss_val, 'val_loss' : epoch_loss_val }
+df = pd.DataFrame(data_dict)
 df.to_csv('loss_acc.csv')
 
 print(f"Best test accuracy: {best_accuracy}")
