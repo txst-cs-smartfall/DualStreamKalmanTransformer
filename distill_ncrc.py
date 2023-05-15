@@ -180,10 +180,10 @@ if __name__ == "__main__":
         validation_generator = torch.utils.data.DataLoader(validation_set, **params) #Each produced sample is 6000 x 229 x 3
 
     else:
-        training_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/train_data.npz')
+        training_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/randtrain_data.npz')
         training_generator = torch.utils.data.DataLoader(training_set, **params)
 
-        validation_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/valid_data.npz')
+        validation_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/randvalid_data.npz')
         validation_generator = torch.utils.data.DataLoader(validation_set, **params)
 
 
