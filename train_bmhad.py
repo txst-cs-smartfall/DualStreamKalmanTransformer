@@ -28,7 +28,11 @@ torch.backends.cudnn.benchmark = True
 # Parameters
 print("Creating params....")
 <<<<<<< HEAD
+<<<<<<< HEAD
 params = {'batch_size':32,
+=======
+params = {'batch_size':64,
+>>>>>>> 4318cad5f5e013e19f76d4b929e3232acb2117f8
 =======
 params = {'batch_size':64,
 >>>>>>> 4318cad5f5e013e19f76d4b929e3232acb2117f8
@@ -137,10 +141,16 @@ for epoch in range(max_epochs):
             accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
         cnt += len(targets)
 <<<<<<< HEAD
+<<<<<<< HEAD
         print(cnt)
     loss /= cnt
     accuracy *= 100. / cnt
     
+=======
+    loss /= cnt
+    accuracy *= 100. / cnt
+    print(loss)
+>>>>>>> 4318cad5f5e013e19f76d4b929e3232acb2117f8
 =======
     loss /= cnt
     accuracy *= 100. / cnt
