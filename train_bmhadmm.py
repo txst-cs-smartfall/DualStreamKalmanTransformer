@@ -1,11 +1,13 @@
 import torch
 import numpy as np
 import pandas as pd
-from Make_Dataset import Poses3d_Dataset, Utd_Dataset
+from Make_Dataset import Poses3d_Dataset, Utd_Dataset, Bmhad_mm
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 import PreProcessing_ncrc
 from Models.model_crossview_fusion import ActTransformerMM
-from Models.model_acc_only import ActTransformerAcc
+from Models.model_acc_bmhad import ActTransformerAcc
+from Models.linearmodel import LinearModel
+from Models.tinyVit import TinyVit
 from loss import FocalLoss
 # from Tools.visualize import get_plot
 import pickle
@@ -28,7 +30,7 @@ torch.backends.cudnn.benchmark = True
 
 # Parameters
 print("Creating params....")
-params = {'batch_size':16,
+params = {'batch_size':4,
           'shuffle': True,
           'num_workers': 0}
 max_epochs = 200
@@ -38,11 +40,13 @@ max_epochs = 200
 # pose2id, labels, partition = PreProcessing_ncrc.preprocess()
 
 print("Creating Data Generators...")
-dataset = 'utd'
-mocap_frames = 100
-acc_frames = 150
-num_joints = 20 
-num_classes = 27
+dataset = 'bmad'
+mocap_frames = 600
+acc_frames = 256
+num_joints = 31
+num_classes = 11
+patch_size = 16
+
 
 if dataset == 'ncrc':
     tr_pose2id,tr_labels,valid_pose2id,valid_labels,pose2id,labels,partition = PreProcessing_ncrc.preprocess()
@@ -55,19 +59,29 @@ if dataset == 'ncrc':
     test_set = Poses3d_Dataset(data='ncrc',list_IDs=partition['test'], labels=labels,has_features = False,pose2id=pose2id, mocap_frames=mocap_frames, acc_frames=acc_frames ,normalize=False)
     test_generator = torch.utils.data.DataLoader(test_set, **params) #Each produced sample is 6000 x 229 x 3
 
-else:
-    training_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/randtrain_data.npz')
+elif dataset == 'utd':
+    training_set = Utd_Dataset('/Users/tousif/Lstm_transformer/data/UTD_MAAD/randtrain_data.npz')
     training_generator = torch.utils.data.DataLoader(training_set, **params)
 
-    validation_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/randvalid_data.npz')
+    validation_set = Utd_Dataset('/Users/tousif/Lstm_transformer/data/UTD_MAAD/randvalid_data.npz')
     validation_generator = torch.utils.data.DataLoader(validation_set, **params)
+
+else : 
+    training_set = Bmhad_mm('/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/bmhad_mm_train.npz', params['batch_size'])
+    training_generator = torch.utils.data.DataLoader(training_set, **params)
+
+    validation_set = Bmhad_mm('/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/bmhad_mm_val.npz',params['batch_size'] )
+    validation_generator = torch.utils.data.DataLoader(validation_set, **params)
+
 
 
 #Define model
 print("Initiating Model...")
 # model = ActTransformerMM(device = device, mocap_frames=mocap_frames, acc_frames=acc_frames, num_joints=num_joints, in_chans=3, acc_coords=3,
 #                                   acc_features=1, spatial_embed=16,has_features = False,num_classes=num_classes, num_heads=8)
-model = ActTransformerAcc(adepth = 3,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = 2, num_classes=num_classes)
+# model = TinyVit(seq_len = acc_frames, patch_size = patch_size, num_classes = num_classes, dim = 64, heads = 8, channels = 3, dim_head = 64, dropout = 0.2)
+# model = TinyVit(seq_len=256, patch_size=16, num_classes=11, depth=3, dim = 64, heads=3, channels=3)
+model = ActTransformerMM(device=device, mocap_frames=mocap_frames, acc_frames=acc_frames, num_joints=num_joints, has_features=False, num_classes=num_classes)
 model = model.to(device)
 
 
@@ -79,9 +93,9 @@ wt_decay=1e-3
 criterion = torch.nn.CrossEntropyLoss()
 # criterion = FocalLoss(alpha=0.25, gamma=2)
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=lr,weight_decay=wt_decay)
+optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 #optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wt_decay)
-scheduler = CosineAnnealingLR(optimizer=optimizer,T_max=100, eta_min=1e-4,last_epoch=-1,verbose=True)
+# scheduler = CosineAnnealingLR(optimizer=optimizer,T_max=100, eta_min=1e-4,last_epoch=-1,verbose=True)
 
 #ASAM
 rho=0.5
@@ -117,6 +131,7 @@ for epoch in range(max_epochs):
     pred_list = []
     target_list = []
     for inputs, targets in training_generator:
+        # inputs = inputs[:, 0, 20:170, :]
         inputs = inputs.to(device); #print("Input batch: ",inputs)
         targets = targets.to(device)
 
@@ -124,7 +139,7 @@ for epoch in range(max_epochs):
 
         # Ascent Step
         #print("labels: ",targets)
-        out, logits,predictions = model(inputs.float())
+        _,logits,predictions= model(inputs.float()) 
         #print("predictions: ",torch.argmax(predictions, 1) )
         batch_loss = criterion(logits, targets)
         batch_loss.mean().backward()
@@ -146,7 +161,7 @@ for epoch in range(max_epochs):
     # print('---Train---')
     # for item1 , item2 in zip(target_list, pred_list):
     #     print(f'{item1} | {item2}')
-    scheduler.step()
+    # scheduler.step()
     print(f"Epoch: {epoch}, Train accuracy: {accuracy:6.2f} %, Train loss: {loss:8.5f}")
     epoch_loss_train.append(loss)
     epoch_acc_train.append(accuracy)
@@ -164,10 +179,11 @@ for epoch in range(max_epochs):
     with torch.no_grad():
         for inputs, targets in validation_generator:
             b = inputs.shape[0]
+            # inputs = inputs[:,0, 20:170,:]
             inputs = inputs.to(device); #print("Validation input: ",inputs)
             targets = targets.to(device)
             
-            _,logits,predictions = model(inputs.float())
+            _,logits, predictions = model(inputs.float())
             val_pred_list.extend(torch.argmax(predictions, 1))
             val_trgt_list.extend(targets)
 
@@ -182,8 +198,8 @@ for epoch in range(max_epochs):
         #         print(f'{item1} | {item2}')
         if best_accuracy < accuracy:
             best_accuracy = accuracy
-            torch.save(model.state_dict(),PATH+'utdaccd3h3_woKD.pt')
-            print("Check point "+PATH+'utdaccd3h3_woKD.pt'+ ' Saved!')
+            torch.save(model.state_dict(),PATH+'bhmadmmd4h8_woKD.pt')
+            print("Check point "+PATH+'bhmadmmd4h8_woKD.pt'+ ' Saved!')
 
     print(f"Epoch: {epoch},Valid accuracy:  {accuracy:6.2f} %, Valid loss:  {val_loss:8.5f}")
     epoch_loss_val.append(val_loss)
@@ -192,7 +208,7 @@ for epoch in range(max_epochs):
 
 data_dict = {'train_accuracy': epoch_acc_train, 'train_loss':epoch_loss_train, 'val_acc': epoch_loss_val, 'val_loss' : epoch_acc_val }
 df = pd.DataFrame(data_dict)
-df.to_csv('loss_utdaccd4h8.csv')
+df.to_csv('loss_bhmadmmd4h8_woKD.csv')
 
 print(f"Best test accuracy: {best_accuracy}")
 print("TRAINING COMPLETED :)")

@@ -37,11 +37,11 @@ num_epochs = 250
 # num_joints = 20
 # num_classes = 27
 
-dataset = 'ncrc'
-mocap_frames = 600
+dataset = 'utd'
+mocap_frames = 100
 acc_frames = 150
-num_joints = 29 
-num_classes = 6
+num_joints = 20
+num_classes = 27
 
 if dataset == 'ncrc':
     tr_pose2id,tr_labels,valid_pose2id,valid_labels,pose2id,labels,partition = PreProcessing_ncrc.preprocess()
@@ -58,7 +58,7 @@ if dataset == 'ncrc':
 
 else:
 
-    test_set = Utd_Dataset('/Users/tousif/Lstm_transformer/randtest_data.npz')
+    test_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/randtest_data.npz')
     test_generator = torch.utils.data.DataLoader(test_set, **params)
 
 
@@ -66,19 +66,19 @@ else:
 #Define model
 print("Initiating Model...")
 
-teacher_model = model = ActTransformerAcc(device = device, acc_frames=acc_frames, num_joints = num_joints, in_chans = 2 , 
-                                          acc_features = acc_features,num_classes=num_classes, has_features = False )
+#teacher_model = model = ActTransformerAcc(device = device, acc_frames=acc_frames, num_joints = num_joints, in_chans = 2 , 
+                                        #   acc_features = acc_features,num_classes=num_classes, has_features = False )
 # student_model.load_state_dict(torch.load('/home/bgu9/Fall_Detection_KD_Multimodal/exps/ncrc/ncrc_ncrc_ckpt_wdistaccurate.pt'))
 
 # teacher_model = ActTransformerMM(device = device, mocap_frames=mocap_frames, acc_frames=150, num_joints=num_joints, in_chans=3, acc_coords=3,
 #                                   acc_features=1, spatial_embed=32,has_features = False,num_classes=num_classes)
-teacher_model.load_state_dict(torch.load('/home/bgu9/Fall_Detection_KD_Multimodal/exps/accwithoutkd-utd/accwithoutkd-utdutdacc_woKd_worand.pt'))
+#teacher_model.load_state_dict(torch.load('/home/bgu9/Fall_Detection_KD_Multimodal/exps/accwithoutkd-utd/accwithoutkd-utdutdacc_woKd_worand.pt'))
 #teacher_model = ActTransformerMM(device = device, mocap_frames=mocap_frames, acc_frames=150, num_joints=num_joints, in_chans=3, acc_coords=3,
                                   #acc_features=1, spatial_embed=32,has_features = False,num_classes=num_classes)
 #teacher_model.load_state_dict(torch.load('/home/bgu9/Fall_Detection_KD_Multimodal/exps/myexp-utd/myexp-utd_best_ckptafter70.pt'))
 # student_model.cuda()
-teacher_model = ActTransformerAcc(adepth = 4,device= device, acc_frames= acc_frames, num_joints = 29,has_features=False)
-teacher_model.load_state_dict(torch.load('exps/ncrc/ncrcacc_woKD.pt'))
+teacher_model = ActTransformerAcc(adepth = 3,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = 2, num_classes=num_classes) 
+teacher_model.load_state_dict(torch.load('/home/bgu9/Fall_Detection_KD_Multimodal/exps/utdKD/utdKDkd_d3h2.pt'))
 teacher_model.to(device=device)
 
 # student_model.eval()
