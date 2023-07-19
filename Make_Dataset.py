@@ -358,4 +358,36 @@ class Bmhad_mm(torch.utils.data.Dataset):
         label = torch.tensor(label)
         label = label.long()
         return data, label
+    
+
+class UTD_mm(torch.utils.data.Dataset):
+    def __init__(self, npz_file, batch_size):
+        # Load data and labels from npz file
+        dataset = np.load(npz_file)
+        self.acc_data = dataset['acc_data']
+        self.skl_data = dataset['skl_data']
+        self.labels = dataset['labels']
+        self.num_samples = self.acc_data.shape[0]
+        self.acc_seq = self.acc_data.shape[1]
+        self.skl_joints = self.skl_data.shape[2]
+        self.skl_seq = self.skl_data.shape[1]
+        self.skl_channels = self.skl_data.shape[3]
+        self.channels = self.acc_data.shape[2]
+        self.batch_size = batch_size
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, index):
+        # Get the batch containing the requested index
+        skl_data = torch.tensor(self.skl_data[index, :, :,:])
+        acc_data = torch.tensor(self.acc_data[index, : , :])
+        data = torch.zeros(self.skl_seq, self.skl_joints+self.acc_seq, self.channels)
+        data[:, :self.skl_joints, :self.skl_channels] = skl_data
+        data[ 0, self.skl_joints:, :self.channels] = acc_data
+        label = self.labels[index]
+        label = label
+        label = torch.tensor(label)
+        label = label.long()
+        return data, label
 

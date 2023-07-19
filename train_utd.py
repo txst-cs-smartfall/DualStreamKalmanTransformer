@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import pandas as pd
-from Make_Dataset import Poses3d_Dataset, Utd_Dataset
+from Make_Dataset import Poses3d_Dataset, Utd_Dataset, UTD_mm
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 import PreProcessing_ncrc
 from Models.model_crossview_fusion import ActTransformerMM
@@ -41,7 +41,7 @@ max_epochs = 200
 print("Creating Data Generators...")
 dataset = 'utd'
 mocap_frames = 100
-acc_frames = 150
+acc_frames = 100
 num_joints = 20 
 num_classes = 27
 
@@ -57,10 +57,10 @@ if dataset == 'ncrc':
     test_generator = torch.utils.data.DataLoader(test_set, **params) #Each produced sample is 6000 x 229 x 3
 
 else:
-    training_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/randtrain_data.npz')
+    training_set = UTD_mm('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/utd_trainwg100.npz', batch_size=params['batch_size'])
     training_generator = torch.utils.data.DataLoader(training_set, **params)
 
-    validation_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/randvalid_data.npz')
+    validation_set = UTD_mm('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/utd_validwg100.npz',  batch_size=params['batch_size'])
     validation_generator = torch.utils.data.DataLoader(validation_set, **params)
 
 
@@ -69,13 +69,13 @@ print("Initiating Model...")
 # model = ActTransformerMM(device = device, mocap_frames=mocap_frames, acc_frames=acc_frames, num_joints=num_joints, in_chans=3, acc_coords=3,
 #                                   acc_features=1, spatial_embed=16,has_features = False,num_classes=num_classes, num_heads=8)
 #model = ActTransformerAcc(adepth = 4,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = 8, num_classes=num_classes)
-model = MMTransformer(device=device, mocap_frames=mocap_frames, acc_frames=acc_frames,num_joints=num_joints,num_classes=num_classes)
+model = MMTransformer(device=device, mocap_frames=mocap_frames, acc_frames=acc_frames,num_joints=num_joints,num_classes=num_classes, acc_coords=6)
 model = model.to(device)
 
 
 print("-----------TRAINING PARAMS----------")
 #Define loss and optimizer
-lr=0.0025
+lr = 0.001
 wt_decay=1e-3
 # class_weights = torch.reciprocal(torch.tensor([74.23, 83.87, 56.75, 49.78, 49.05, 93.92]))
 criterion = torch.nn.CrossEntropyLoss()

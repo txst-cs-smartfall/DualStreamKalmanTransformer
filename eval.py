@@ -1,11 +1,12 @@
 import torch
 import numpy as np
 import torch.nn.functional as F
-from Make_Dataset import Poses3d_Dataset, Utd_Dataset
+from Make_Dataset import Poses3d_Dataset, Utd_Dataset, UTD_mm
 import torch.nn as nn
 import PreProcessing_ncrc
 from Models.model_crossview_fusion import ActTransformerMM
 from Models.model_acc_only import ActTransformerAcc
+from Models.earlyfusion import MMTransformer
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, f1_score, precision_recall_fscore_support
@@ -21,7 +22,7 @@ torch.backends.cudnn.benchmark = True
 
 # Parameters
 print("Creating params....")
-params = {'batch_size':8,
+params = {'batch_size':32,
           'shuffle': True,
           'num_workers': 0}
 
@@ -39,7 +40,7 @@ num_epochs = 250
 
 dataset = 'utd'
 mocap_frames = 100
-acc_frames = 150
+acc_frames = 100
 num_joints = 20
 num_classes = 27
 
@@ -58,7 +59,7 @@ if dataset == 'ncrc':
 
 else:
 
-    test_set = Utd_Dataset('/home/bgu9/Fall_Detection_KD_Multimodal/data/UTD_MAAD/randtest_data.npz')
+    test_set = UTD_mm('/home/bgu9/Fall_Detection_KD_Multimodal/utd_testwg100.npz',  batch_size=32)
     test_generator = torch.utils.data.DataLoader(test_set, **params)
 
 
@@ -77,8 +78,9 @@ print("Initiating Model...")
                                   #acc_features=1, spatial_embed=32,has_features = False,num_classes=num_classes)
 #teacher_model.load_state_dict(torch.load('/home/bgu9/Fall_Detection_KD_Multimodal/exps/myexp-utd/myexp-utd_best_ckptafter70.pt'))
 # student_model.cuda()
-teacher_model = ActTransformerAcc(adepth = 3,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = 2, num_classes=num_classes) 
-teacher_model.load_state_dict(torch.load('/home/bgu9/Fall_Detection_KD_Multimodal/exps/utdKD/utdKDkd_d3h2.pt'))
+#teacher_model = ActTransformerAcc(adepth = 3,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = 2, num_classes=num_classes) 
+teacher_model = MMTransformer(device=device, mocap_frames=mocap_frames, acc_frames=acc_frames,num_joints=num_joints,num_classes=num_classes, acc_coords=6, )
+teacher_model.load_state_dict(torch.load('/home/bgu9/Fall_Detection_KD_Multimodal/exps/utd/utdmmd4h4_woKD_ef.pt'))
 teacher_model.to(device=device)
 
 # student_model.eval()
@@ -100,7 +102,7 @@ with torch.no_grad():
         
         
         out, student_logits,predictions = teacher_model(inputs.float())
-        loss_score = F.cross_entropy(predictions, targets)
+        loss_score = F.cross_entropy(student_logits, targets)
         y_pred.extend(torch.argmax(predictions, 1).cpu().numpy().tolist())
         with torch.no_grad():
             val_loss += loss_score.sum().item()
