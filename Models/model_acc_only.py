@@ -5,7 +5,6 @@ import math
 import logging
 from functools import partial
 from collections import OrderedDict
-from this import s
 from einops import rearrange, repeat
 import numpy as np
 import torch
@@ -15,7 +14,7 @@ from .model_utils import Block
 
 
 class ActTransformerAcc(nn.Module):
-    def __init__(self, device, acc_frames=150, num_joints=29, in_chans=3, acc_coords=3, acc_embed=32, acc_features=18, adepth=4, num_heads=4, mlp_ratio=2., qkv_bias=True,
+    def __init__(self, acc_frames=150, num_joints=29, in_chans=3, acc_coords=3, acc_embed=32, acc_features=18, adepth=4, num_heads=4, mlp_ratio=2., qkv_bias=True,
                  qk_scale=None, op_type='cls', embed_type='lin', fuse_acc_features=False,has_features = False,
                  drop_rate=0.2, attn_drop_rate=0.2, drop_path_rate=0.2,  norm_layer=None, num_classes=6):
 
