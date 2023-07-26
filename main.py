@@ -1,9 +1,10 @@
 import argparse
 import yaml
 
-def get_parser():
+def parse_args():
 
     parser = argparse.ArgumentParser(description = 'Distillation')
+    parser.add_argument('--config' , default = './config/utd/student.yaml')
     parser.add_argument('--batch-size', type = int, default = 8, metavar = 'N',
                         help = 'input batch size for training (default: 8)')
 
@@ -13,12 +14,11 @@ def get_parser():
     parser.add_argument('--epochs', type = int , default = 70, metavar = 'N', 
                         help = 'number of epochs to train (default: 10)')
 
-    parser.add_argument('--lr', type = float, default = 0.0025, metavar = 'LR', 
-                        help = 'learning rate (default: 0.01)')
+    parser.add_argument('--base_lr', type = float, default = 0.001, metavar = 'LR', 
+                        help = 'learning rate (default: 0.001)')
 
-    parser.add_argument('--momentum', type = float, default = 0.9, metavar = 'M',
-                        help = 'SGD momentum (default: 0.5)')
-
+    parser.add_argument('--model' ,default= None, help = 'Name of Model to load')
+    parser.add_argument('--model-args',action=DictAction,default=dict(), help='the arguments of model')
     parser.add_argument('--no-cuda', action = 'store_true', default = False, 
                         help = 'disables CUDA training')
     
@@ -40,18 +40,16 @@ def get_parser():
 
     parser.add_argument('--fusion', type = str, default = 'simple', metavar = 'F', help = "Fusion method to choose (default : Simple)")
 
-    arg = parser.parse_args()
-
-    return arg
+    return parser
 
 if __name__ == "__main__":
-    parser = get_parser()
+    parser = parse_args()
 
     # load arg form config file
     p = parser.parse_args()
     if p.config is not None:
         with open(p.config, 'r') as f:
-            default_arg = yaml.load(f)
+            default_arg = yaml.safe_load(f)
         key = vars(p).keys()
         for k in default_arg.keys():
             if k not in key:

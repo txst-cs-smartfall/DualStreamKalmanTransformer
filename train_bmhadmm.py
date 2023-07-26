@@ -199,8 +199,8 @@ for epoch in range(max_epochs):
         #         print(f'{item1} | {item2}')
         if best_accuracy < accuracy:
             best_accuracy = accuracy
-            torch.save(model.state_dict(),PATH+'bhmadmmd4h8_woKD_norandom.pt')
-            print("Check point "+PATH+'bhmadmmd4h8_woKD_norandom.pt'+ ' Saved!')
+            torch.save(model.state_dict(),PATH+'bhmadmmd4h8_woKD_norandom_revised.pt')
+            print("Check point "+PATH+'bhmadmmd4h8_woKD_norandom_revised.pt'+ ' Saved!')
 
     print(f"Epoch: {epoch},Valid accuracy:  {accuracy:6.2f} %, Valid loss:  {val_loss:8.5f}")
     epoch_loss_val.append(val_loss)

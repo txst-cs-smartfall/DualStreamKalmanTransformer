@@ -126,7 +126,6 @@ class MMTransformer(nn.Module):
 
         ##get cross fusion indexes
         cv_signals = []
-
         for _, blk in enumerate(self.Accelerometer_blocks):
             cv_sig, x = blk(x)
             cv_signals.append(x)
@@ -193,8 +192,6 @@ class MMTransformer(nn.Module):
 
             fused_data = x + acc_data
             x = blk(fused_data)
-  
-        
         x = self.Temporal_norm(x)
 
         ###Extract Class token head from the output
@@ -228,7 +225,6 @@ class MMTransformer(nn.Module):
         #Get skeletal features
         x, cls_token = self.Spatial_forward_features(x) # in: B x mocap_frames x num_joints x in_chann  out: x = b x mocap_frame x (num_joints*Se) cls_token b x mocap_frames*Se
         if x.shape[1] != cv_signals[1].shape[1]-1:
-            print('in')
             x = self.frame_reduce(x)
 
         #Pass cls  token to temporal transformer
