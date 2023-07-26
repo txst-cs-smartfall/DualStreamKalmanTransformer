@@ -5,8 +5,8 @@ from Make_Dataset import Poses3d_Dataset, Utd_Dataset, UTD_mm, Bmhad_mm
 import torch.nn as nn
 import PreProcessing_ncrc
 from Models.model_crossview_fusion import ActTransformerMM
-#from Models.model_acc_only import ActTransformerAcc
-from Models.earlyconcat import ActTransformerAcc
+from Models.model_acc_only import ActTransformerAcc
+#from Models.earlyconcat import ActTransformerAcc
 from Models.earlyfusion import MMTransformer
 import numpy as np
 import matplotlib.pyplot as plt
@@ -31,7 +31,19 @@ num_epochs = 250
 
 # Generators
 #pose2id,labels,partition = PreProcessing_ncrc_losocv.preprocess_losocv(8)
-
+exp = 'bmhad_std_wokd' #Assign an experiment id
+dataset = 'bmhad'
+mocap_frames = 600
+acc_frames = 256
+num_joints = 31 
+num_classes = 11
+patch_size = 16
+acc_embed = 32 
+adepth = 4
+num_heads = 4
+acc_coords = 3
+lr=0.001
+wt_decay=1e-3
 
 
 
@@ -41,11 +53,6 @@ num_epochs = 250
 # num_joints = 20
 # num_classes = 27
 
-dataset = 'bmad'
-mocap_frames = 600
-acc_frames = 256
-num_joints = 31
-num_classes = 11
 
 if dataset == 'ncrc':
     tr_pose2id,tr_labels,valid_pose2id,valid_labels,pose2id,labels,partition = PreProcessing_ncrc.preprocess()
@@ -83,7 +90,8 @@ print("Initiating Model...")
 #teacher_model = ActTransformerAcc(adepth = 3,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = 2, num_classes=num_classes) 
 #teacher_model =MMTransformer(device=device, mocap_frames=mocap_frames, acc_frames=acc_frames,num_joints=num_joints,num_classes=num_classes)
 #teacher_model.load_state_dict(torch.load('exps/bmhad/bhmadmmd4h8_woKD_norandom.pt'))
-teacher_model = ActTransformerAcc(acc_embed=16,adepth = 2,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = 2, num_classes=num_classes)
+teacher_model = ActTransformerAcc(acc_embed=acc_embed,adepth = adepth,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = num_heads, num_classes=num_classes)
+teacher_model.load_state_dict(torch.load('exps/bmhad_std_wokd/bmhad_std_d4h4_woKD.pt'))
 teacher_model.to(device=device)
 
 # student_model.eval()

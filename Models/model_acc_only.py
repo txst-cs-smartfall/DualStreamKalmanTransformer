@@ -113,7 +113,6 @@ class ActTransformerAcc(nn.Module):
 
         x = torch.cat((x,class_token),dim=1) 
         _,_,Sa = x.shape
-    
         x += self.Acc_pos_embed
         x = self.pos_drop(x)
 
@@ -150,7 +149,6 @@ class ActTransformerAcc(nn.Module):
         else: 
             sx = inputs[:, 0 , self.num_joints:, :self.acc_coords]
         sx = torch.reshape(sx, (b,-1,1,self.acc_coords) ) #B x Fa x 1 x 3
-
 
         #Get acceleration features
         sx = self.Acc_forward_features(sx); #print("Input to ACC Transformer: ",sx) #in: F x Fa x 3 x 1,  op: B x St
