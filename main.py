@@ -1,11 +1,20 @@
 import argparse
 import yaml
+import torch
+import traceback
+import random 
+import numpy as np 
+import sys
+import warnings
+import json
 
 def parse_args():
 
     parser = argparse.ArgumentParser(description = 'Distillation')
     parser.add_argument('--config' , default = './config/utd/student.yaml')
-    parser.add_argument('--batch-size', type = int, default = 8, metavar = 'N',
+
+    #training
+    parser.add_argument('--batch-size', type = int, default = 16, metavar = 'N',
                         help = 'input batch size for training (default: 8)')
 
     parser.add_argument('--test-batch-size', type = int, default = 8, 
@@ -14,33 +23,78 @@ def parse_args():
     parser.add_argument('--epochs', type = int , default = 70, metavar = 'N', 
                         help = 'number of epochs to train (default: 10)')
 
-    parser.add_argument('--base_lr', type = float, default = 0.001, metavar = 'LR', 
+    #optim
+    parser.add_argument('--base-lr', type = float, default = 0.001, metavar = 'LR', 
                         help = 'learning rate (default: 0.001)')
+    parser.add_argument('--weight_decay', type = float , default=0.0004)
 
+    #model
     parser.add_argument('--model' ,default= None, help = 'Name of Model to load')
-    parser.add_argument('--model-args',action=DictAction,default=dict(), help='the arguments of model')
-    parser.add_argument('--no-cuda', action = 'store_true', default = False, 
-                        help = 'disables CUDA training')
+
+    #model args
+    # parser.add_argument('--mocap-frames', default=600, type = int, help='Skeleton length')
+    # parser.add_argument('--acc-frames', default=256, type = int, help = 'Accelerometer length')
+    # parser.add_argument('--num-joints', default=31, type = int, help = 'Num joints in skeleton')
+    # parser.add_argument('--num-classes', default=11, type = int) 
+    # parser.add_argument('--acc-embed', default=32, type =int, help = 'Acceleromter embedding' )
+    # parser.add_argument('--adepth', default = 4, type = int)
+    # parser.add_argument('--num-heads', default= 4, type = int)]
+    parser.add_argument('--device', nargs='+', default=[0], type = int)
+    parser.add_argument('--model-args', default= str)
+    # parser.add_argument('--no-cuda', action = 'store_true', default = False, 
+    #                     help = 'disables CUDA training')
     
-    parser.add_argument('--seed', type =  int , default = 1 , help = 'random seed (default: 1)') 
+    parser.add_argument('--seed', type =  int , default = 2 , help = 'random seed (default: 1)') 
 
     parser.add_argument('--log-interval', type = int , default = 10, metavar = 'N',
                         help = 'how many bathces to wait before logging training status')
-    parser.add_argument('--val-bsize', type = int, default = 8, metavar = 'N', 
+    parser.add_argument('--val-batch-size', type = int, default = 32, metavar = 'N', 
                         help = 'Validation batch sieze (default : 8)')
     parser.add_argument('--dataset', type = str, default= 'ncrc', metavar = 'D', help = 'Which dataset to use')
-
-    parser.add_argument('--mocap', type = int, default = 600, help = 'Skeleton Frame number')
-
-    parser.add_argument('--acc-frame', type = int , default = 150, help = 'Acceleton frame number')
-
-    parser.add_argument('--num-joints', type = int, default = 29, help = 'Number of joints in skeleton data')
-
-    parser.add_argument('--num-classes', type = int, default = 6, help = 'Number of classes in data')
 
     parser.add_argument('--fusion', type = str, default = 'simple', metavar = 'F', help = "Fusion method to choose (default : Simple)")
 
     return parser
+
+def init_seed(seed):
+    torch.cuda.manual_seed_all(seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    # torch.backends.cudnn.enabled = True
+    # training speed is too slow if set to True
+    torch.backends.cudnn.deterministic = False
+
+    # on cuda 11 cudnn8, the default algorithm is very slow
+    # unlike on cuda 10, the default works well
+    torch.backends.cudnn.benchmark = True
+
+def import_class(import_str):
+    mod_str , _sep, class_str = import_str.rpartition('.')
+    __import__(mod_str)
+    try:
+        return getattr(sys.modules[mod_str], class_str)
+    except AttributeError:
+        raise ImportError('Class %s cannot be found (%s)' % (class_str, traceback.format_exception(*sys.exc_info())))
+
+class Trainer():
+    
+    def __init__(self, arg):
+        self.arg = arg
+        # self.save_arg()
+        self.load_model()
+    
+    def load_model(self):
+        use_cuda = torch.cuda.is_available()
+        output_device = self.arg.device[0] if type(self.arg.device) is list else self.arg.device
+        Model = import_class(self.arg.model)
+        self.model = Model(**self.arg.model_args).to(f'cuda:{output_device}' if use_cuda else 'cpu')
+        print(self.model)
+    
+    # def save_arg(self):
+    #     #save arg
+    #     arg_dict = vars(self.arg)
+
 
 if __name__ == "__main__":
     parser = parse_args()
@@ -58,3 +112,5 @@ if __name__ == "__main__":
         parser.set_defaults(**default_arg)
 
     arg = parser.parse_args()
+    init_seed(arg.seed)
+    Trainer(arg)

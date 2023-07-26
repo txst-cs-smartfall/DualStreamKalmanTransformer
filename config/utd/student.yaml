@@ -1,23 +1,23 @@
 #Model
-model: model.model_acc_only.ActTransformerAcc
+model: Models.model_acc_only.ActTransformerAcc
+
+#model_args
 model_args:
-  mocap_frames : 600
   acc_frames : 256
   num_joints : 31 
   num_classes : 11
-  patch_size : 16
   acc_embed : 32 
   adepth : 4
   num_heads : 4
-  acc_coords : 3
+
 
 #optim
 weight_decay: 0.0004
-base_lr: 0.01
+base_lr: 0.001
 
 
 # training
-device: 0
-batch_size: 32
-test_batch_size: 32
-num_epoch: 200
+batch_size: 16
+test_batch_size: 16
+val_batch_size : 16
+epochs: 200

@@ -47,7 +47,8 @@ acc_frames = 256
 num_joints = 31 
 num_classes = 11
 patch_size = 16
-
+adepth = 4
+num_heads = 4
 
 if dataset == 'ncrc':
     tr_pose2id,tr_labels,valid_pose2id,valid_labels,pose2id,labels,partition = PreProcessing_ncrc.preprocess()
@@ -82,7 +83,7 @@ print("Initiating Model...")
 #                                   acc_features=1, spatial_embed=16,has_features = False,num_classes=num_classes, num_heads=8)
 # model = TinyVit(seq_len = acc_frames, patch_size = patch_size, num_classes = num_classes, dim = 64, heads = 8, channels = 3, dim_head = 64, dropout = 0.2)
 # model = TinyVit(seq_len=256, patch_size=16, num_classes=11, depth=3, dim = 64, heads=3, channels=3)
-model = ActTransformerAcc(device= device, in_chans=3, acc_coords=3, acc_embed=32, adepth = 4, num_heads = 4, acc_frames=256, num_classes=11)
+model = ActTransformerAcc(device= device, in_chans=3, acc_coords=3, acc_embed=32, adepth = adepth, num_heads = num_heads, acc_frames=acc_frames, num_classes=11)
 model = model.to(device)
 
 
@@ -199,7 +200,7 @@ for epoch in range(max_epochs):
         #         print(f'{item1} | {item2}')
         if best_accuracy < accuracy:
             best_accuracy = accuracy
-            torch.save(model.state_dict(),PATH+f'{data_accd4h4_woKD.pt')
+            torch.save(model.state_dict(),PATH+f'{dataset}_std_d{ade}h4_woKD.pt')
             print("Check point "+PATH+'bmhad_ccd4h4_woKD.pt'+ ' Saved!')
 
     print(f"Epoch: {epoch},Valid accuracy:  {accuracy:6.2f} %, Valid loss:  {val_loss:8.5f}")
