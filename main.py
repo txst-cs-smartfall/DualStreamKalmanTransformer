@@ -5,8 +5,10 @@ import traceback
 import random 
 import numpy as np 
 import sys
+import time
 import torch.nn as nn
 import torch.optim as optim
+from tqdm import tqdm
 import warnings
 import json
 
@@ -60,10 +62,19 @@ def parse_args():
                         help = 'Validation batch sieze (default : 8)')
     parser.add_argument('--dataset', type = str, default= 'ncrc', metavar = 'D', help = 'Which dataset to use')
 
-    parser.add_argument('--fusion', type = str, default = 'simple', metavar = 'F', help = "Fusion method to choose (default : Simple)")
-
+   
+    parser.add_argument('--work-dir', type = str, default = 'simple', metavar = 'F', help = "Working Directory")
+    parser.add_argument('--print-log',type=str2bool,default=True,help='print logging or not')
     return parser
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Unsupported value encountered.')
+    
 def init_seed(seed):
     torch.cuda.manual_seed_all(seed)
     torch.manual_seed(seed)
@@ -94,10 +105,10 @@ class Trainer():
     
     def load_model(self):
         use_cuda = torch.cuda.is_available()
-        output_device = self.arg.device[0] if type(self.arg.device) is list else self.arg.device
+        self.output_device = self.arg.device[0] if type(self.arg.device) is list else self.arg.device
         Model = import_class(self.arg.model)
-        self.model = Model(**self.arg.model_args).to(f'cuda:{output_device}' if use_cuda else 'cpu')
-        self.loss = nn.CrossEntropyLoss().cuda(output_device)
+        self.model = Model(**self.arg.model_args).to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
+        self.loss = nn.CrossEntropyLoss().cuda(self.output_device)
     
     def load_optimizer(self):
         
@@ -148,7 +159,78 @@ class Trainer():
             drop_last=False,
             worker_init_fn=init_seed)
 
-        def train(self, epoch):
+    def record_time(self):
+        self.cur_time = time.time()
+        return self.cur_time
+
+    def split_time(self):
+        split_time = time.time() - self.cur_time
+        self.record_time()
+        return split_time
+
+    def print_log(self, string, print_time = True):
+        print(string)
+        if arg.print_log:
+            with open('{}/log.txt'.format(self.arg.work_dir), 'a') as f:
+                print(string, file = f)
+
+    def train(self, epoch, save_model = False):
+        self.model.train()
+        self.record_time()
+        loader = self.data_loader['train']
+        timer = dict(dataloader = 0.001, model = 0.001, statistics = 0.001)
+        loss_value = []
+        acc_value = []
+        accuracy = 0
+        cnt = 0
+        train_loss = 0
+
+        process = tqdm(loader, ncols = 40)
+
+        for batch_idx, (inputs, targets) in enumerate(process):
+            with torch.no_grad():
+                inputs = inputs.cuda(self.output_device) #print("Input batch: ",inputs)
+                targets = targets.cuda(self.output_device)
+            
+            timer['dataloader'] += self.split_time()
+
+            self.optimizer.zero_grad()
+
+            # Ascent Step
+            #print("labels: ",targets)
+            out, logits,predictions = self.model(inputs.float())
+            #print("predictions: ",torch.argmax(predictions, 1) )
+            loss = self.criterion(logits, targets)
+            loss.mean().backward()
+            self.optimizer.step()
+
+            timer['model'] += self.split_time()
+            with torch.no_grad():
+                train_loss += loss.sum().item()
+                accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
+            cnt += len(targets)
+            train_loss /= cnt
+            accuracy *= 100. / cnt 
+            time['statistics'] += self.split_time()
+        loss_value.append(train_loss)
+        acc_value.append[accuracy] 
+
+        proportion = {
+            k: '{:02d}%'.format(int(round(v * 100 / sum(timer.values()))))
+            for k, v in timer.items()
+        }
+        self.print_log(
+            '\tTraining Loss: {:4f}. Training Acc: {:2f}%'.format(train_loss, accuracy)
+        )
+        self.print_log('\tTime consumption: [Data]{dataloader}, [Network]{model}'.format(**proportion))
+
+        #Still need to work with this one
+        if save_model:
+            state_dict = self.model.state_dict()
+            weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in state_dict.items()])
+
+            torch.save(weights, self.arg.model_saved_name + '-' + str(epoch+1) + '-' + str(int(self.global_step)) + '.pt')
+
     # def save_arg(self):
     #     #save arg
     #     arg_dict = vars(self.arg)

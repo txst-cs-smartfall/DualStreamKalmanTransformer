@@ -23,7 +23,7 @@ torch.backends.cudnn.benchmark = True
 
 # Parameters
 print("Creating params....")
-params = {'batch_size':32,
+params = {'batch_size':4,
           'shuffle': True,
           'num_workers': 0}
 
@@ -90,8 +90,8 @@ print("Initiating Model...")
 #teacher_model = ActTransformerAcc(adepth = 3,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = 2, num_classes=num_classes) 
 #teacher_model =MMTransformer(device=device, mocap_frames=mocap_frames, acc_frames=acc_frames,num_joints=num_joints,num_classes=num_classes)
 #teacher_model.load_state_dict(torch.load('exps/bmhad/bhmadmmd4h8_woKD_norandom.pt'))
-teacher_model = ActTransformerAcc(acc_embed=acc_embed,adepth = adepth,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = num_heads, num_classes=num_classes)
-teacher_model.load_state_dict(torch.load('exps/bmhad_std_wokd/bmhad_std_d4h4_woKD.pt'))
+teacher_model = ActTransformerAcc(adepth = 3,num_classes=num_classes, acc_frames= acc_frames, num_joints =num_joints,has_features=False, num_heads=4, acc_embed = 32)
+teacher_model.load_state_dict(torch.load('exps/bmhad_KD/bmhad_KD.pt'))
 teacher_model.to(device=device)
 
 # student_model.eval()
