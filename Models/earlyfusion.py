@@ -102,7 +102,8 @@ class MMTransformer(nn.Module):
         )
         
         # self.spatial_frame_reduce = nn.Conv1d(self.mocap_frames, self.acc_frames, 1,1)
-        self.frame_reduce = nn.Conv1d(self.mocap_frames, self.acc_frames, 1,1)
+        self.frame_reduce_mf = nn.Conv1d(self.mocap_frames, self.acc_frames, 1,1)
+        self.frame_reduce_acc = nn.Conv1d(self.acc_frames+1, self.mocap_frames+1, 1, 1)
 
     def Acc_forward_features(self, x):
         b,f,p,c = x.shape
@@ -189,7 +190,12 @@ class MMTransformer(nn.Module):
             # skl_data = self.frame_reduce(x)
             
             acc_data = cv_signals[cv_idx]
-
+            if x.shape[1] > cv_signals[1].shape[1]-1:
+                x = self.frame_reduce_mf(x)
+            elif x.shape[1] < cv_signals[1].shape[1] -1:
+                acc_data = self.frame_reduce_acc(acc_data)
+            else: 
+                x = x
             fused_data = x + acc_data
             x = blk(fused_data)
         x = self.Temporal_norm(x)
@@ -224,8 +230,8 @@ class MMTransformer(nn.Module):
 
         #Get skeletal features
         x, cls_token = self.Spatial_forward_features(x) # in: B x mocap_frames x num_joints x in_chann  out: x = b x mocap_frame x (num_joints*Se) cls_token b x mocap_frames*Se
-        if x.shape[1] != cv_signals[1].shape[1]-1:
-            x = self.frame_reduce(x)
+
+        
 
         #Pass cls  token to temporal transformer
         # print(f'Class token {cls_token.shape}')

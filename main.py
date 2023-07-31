@@ -12,7 +12,7 @@ from tqdm import tqdm
 import warnings
 import json
 
-def parse_args():
+def get_args():
 
     parser = argparse.ArgumentParser(description = 'Distillation')
     parser.add_argument('--config' , default = './config/utd/student.yaml')
@@ -24,10 +24,12 @@ def parse_args():
     parser.add_argument('--test-batch-size', type = int, default = 8, 
                         metavar = 'N', help = 'input batch size for testing(default: 1000)')
 
-    parser.add_argument('--epochs', type = int , default = 70, metavar = 'N', 
+    parser.add_argument('--num-epoch', type = int , default = 70, metavar = 'N', 
                         help = 'number of epochs to train (default: 10)')
+    parser.add_argument('--start-epoch', type = int, default = 0)
 
     #optim
+    parser.add_argument('--optimizer', type = str, default = 'Adam')
     parser.add_argument('--base-lr', type = float, default = 0.001, metavar = 'LR', 
                         help = 'learning rate (default: 0.001)')
     parser.add_argument('--weight-decay', type = float , default=0.0004)
@@ -43,8 +45,11 @@ def parse_args():
     # parser.add_argument('--acc-embed', default=32, type =int, help = 'Acceleromter embedding' )
     # parser.add_argument('--adepth', default = 4, type = int)
     # parser.add_argument('--num-heads', default= 4, type = int)]
+
+    #model args
     parser.add_argument('--device', nargs='+', default=[0], type = int)
     parser.add_argument('--model-args', default= str, help = 'A dictionary for model args')
+    parser.add_argument('--weights', type = str, help = 'Location of weight file')
     # parser.add_argument('--no-cuda', action = 'store_true', default = False, 
     #                     help = 'disables CUDA training')
 
@@ -53,18 +58,23 @@ def parse_args():
     parser.add_argument('--train-feeder-args',default=str, help = 'A dict for dataloader args' )
     parser.add_argument('--val-feeder-args', default=str , help = 'A dict for validation data loader')
     parser.add_argument('--test_feeder_args',default=str, help= 'A dict for test data loader')
-    
+
+    #initializaiton
     parser.add_argument('--seed', type =  int , default = 2 , help = 'random seed (default: 1)') 
 
     parser.add_argument('--log-interval', type = int , default = 10, metavar = 'N',
                         help = 'how many bathces to wait before logging training status')
-    parser.add_argument('--val-batch-size', type = int, default = 32, metavar = 'N', 
-                        help = 'Validation batch sieze (default : 8)')
-    parser.add_argument('--dataset', type = str, default= 'ncrc', metavar = 'D', help = 'Which dataset to use')
+
 
    
     parser.add_argument('--work-dir', type = str, default = 'simple', metavar = 'F', help = "Working Directory")
     parser.add_argument('--print-log',type=str2bool,default=True,help='print logging or not')
+    
+    parser.ad_arguments('--phase', type = str, default = 'train')
+    
+    parser.add_argument('--num-worker', type = int, default= 0)
+    parser.add_argument('--result-file', type = str, help = 'Name of resutl file')
+    
     return parser
 
 def str2bool(v):
@@ -102,6 +112,11 @@ class Trainer():
         self.arg = arg
         # self.save_arg()
         self.load_model()
+        self.load_optimizer()
+
+        if self.arg.phase == 'test':
+            self.load_weights()
+
     
     def load_model(self):
         use_cuda = torch.cuda.is_available()
@@ -109,6 +124,9 @@ class Trainer():
         Model = import_class(self.arg.model)
         self.model = Model(**self.arg.model_args).to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
         self.loss = nn.CrossEntropyLoss().cuda(self.output_device)
+    
+    def load_weights(self, weights):
+        self.model.load_state_dict(torch.load(self.arg.weights))
     
     def load_optimizer(self):
         
@@ -151,13 +169,16 @@ class Trainer():
                 num_workers=self.arg.num_worker,
                 drop_last=True,
                 worker_init_fn=init_seed)
-        self.data_loader['test'] = torch.utils.data.DataLoader(
-            dataset=Feeder(**self.arg.test_feeder_args),
-            batch_size=self.arg.test_batch_size,
-            shuffle=False,
-            num_workers=self.arg.num_worker,
-            drop_last=False,
-            worker_init_fn=init_seed)
+        else:
+            self.data_loader['test'] = torch.utils.data.DataLoader(
+                dataset=Feeder(**self.arg.test_feeder_args),
+                batch_size=self.arg.test_batch_size,
+                shuffle=False,
+                num_workers=self.arg.num_worker,
+                drop_last=False,
+                worker_init_fn=init_seed)
+    
+
 
     def record_time(self):
         self.cur_time = time.time()
@@ -174,7 +195,7 @@ class Trainer():
             with open('{}/log.txt'.format(self.arg.work_dir), 'a') as f:
                 print(string, file = f)
 
-    def train(self, epoch, save_model = False):
+    def train(self, epoch):
         self.model.train()
         self.record_time()
         loader = self.data_loader['train']
@@ -184,7 +205,7 @@ class Trainer():
         accuracy = 0
         cnt = 0
         train_loss = 0
-
+        self.best_accuracy  = 0
         process = tqdm(loader, ncols = 40)
 
         for batch_idx, (inputs, targets) in enumerate(process):
@@ -214,7 +235,6 @@ class Trainer():
             time['statistics'] += self.split_time()
         loss_value.append(train_loss)
         acc_value.append[accuracy] 
-
         proportion = {
             k: '{:02d}%'.format(int(round(v * 100 / sum(timer.values()))))
             for k, v in timer.items()
@@ -225,11 +245,86 @@ class Trainer():
         self.print_log('\tTime consumption: [Data]{dataloader}, [Network]{model}'.format(**proportion))
 
         #Still need to work with this one
-        if save_model:
-            state_dict = self.model.state_dict()
-            weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in state_dict.items()])
+        # if save_model:
+        #     state_dict = self.model.state_dict()
+        #     #weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in state_dict.items()])
+        #     torch.save(state_dict, self.arg.model_saved_name + '-' + str(epoch+1) + '-' + str(int(self.global_step)) + '.pt')
+    
+    def eval(self, epoch, loader_name = 'test', result_file = None):
 
-            torch.save(weights, self.arg.model_saved_name + '-' + str(epoch+1) + '-' + str(int(self.global_step)) + '.pt')
+        if result_file is not None : 
+            f_r = open (result_file, 'w')
+        
+        self.model.eval()
+
+        self.print_log('Eval epoch: {}'.format(epoch+1))
+
+        loss = 0
+        cnt = 0
+        accuracy = 0
+        label_list = []
+        pred_list = []
+        
+        process = tqdm(self.data_loader[loader_name], ncols=40)
+        with torch.no_grad():
+            for batch_idx, (inputs, targets) in enumerate(process):
+                label_list.extend(targets.tolist())
+                data = data.cuda(self.output_device)
+                targets = targets.cuda(self.output_device)
+
+                _,logits,predictions = self.model(inputs.float())
+
+                batch_loss = self.loss(logits, targets)
+                loss += batch_loss.sum().item()
+                accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
+                pred_list.extend(torch.argmax(predictions ,1).tolist())
+                cnt += len(targets)
+            loss /= cnt
+            accuracy *= 100./cnt
+        
+        if result_file is not None:
+            predict = pred_list
+            true = label_list
+
+            for i, x in enumerate(predict):
+                f_r.write(str(x) +  '==>' + str(true[i]) + '\n')
+        
+        print('Accuracy:' , accuracy, 'loss:', loss)
+
+        if self.arg.phase == 'train':
+            if accuracy > self.best_accuracy :
+                self.best_accuracy = accuracy
+                state_dict = self.model.state_dict()
+                #weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in state_dict.items()])
+                torch.save(state_dict, self.arg.work_dir + '/' + self.arg.model_saved_name + '-' + str(epoch+1) + '.pt')
+            
+
+    def start(self):
+        if self.arg.phase == 'train':
+            self.print_log('Parameters: \n{}\n'.format(str(vars(self.arg))))
+            self.global_step = self.arg.start_epoch * len(self.data_loader['train']) / self.arg.batch_size
+
+            def count_parameters(model):
+                return sum(p.numel() for p in model.parameters() if p.requires_grad)
+            
+            num_params = count_parameters(self.model)
+            self.print_log(f'# Parameters: {num_params}')
+            for epoch in range(self.arg.start_epoch, self.arg.num_epoch)
+                self.train(epoch)
+                self.eval(epoch, loader_name='val', result_file=self.arg.result_file)
+            self.print_log(f'Best accuracy: {self.best_acc}')
+            self.print_log(f'Epoch number: {self.best_acc_epoch}')
+            self.print_log(f'Model name: {self.arg.work_dir}')
+            self.print_log(f'Model total number of params: {num_params}')
+            self.print_log(f'Weight decay: {self.arg.weight_decay}')
+            self.print_log(f'Base LR: {self.arg.base_lr}')
+            self.print_log(f'Batch Size: {self.arg.batch_size}')
+            self.print_log(f'seed: {self.arg.seed}')
+        
+        elif self.arg.phase == 'test' :
+            if self.arg.weights is None: 
+                raise ValueError('Please appoint --weights')
+            self.eval(epoch=0, loader_name='test', result_file=self.arg.result_file)
 
     # def save_arg(self):
     #     #save arg
@@ -237,7 +332,7 @@ class Trainer():
 
 
 if __name__ == "__main__":
-    parser = parse_args()
+    parser = get_args()
 
     # load arg form config file
     p = parser.parse_args()
