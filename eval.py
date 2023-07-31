@@ -31,27 +31,27 @@ num_epochs = 250
 
 # Generators
 #pose2id,labels,partition = PreProcessing_ncrc_losocv.preprocess_losocv(8)
-exp = 'bmhad_std_wokd' #Assign an experiment id
-dataset = 'bmhad'
-mocap_frames = 600
-acc_frames = 256
-num_joints = 31 
-num_classes = 11
-patch_size = 16
-acc_embed = 32 
-adepth = 4
-num_heads = 4
-acc_coords = 3
-lr=0.001
-wt_decay=1e-3
+# exp = 'bmhad_std_wokd' #Assign an experiment id
+# dataset = 'bmhad'
+# mocap_frames = 600
+# acc_frames = 256
+# num_joints = 31 
+# num_classes = 11
+# patch_size = 16
+# acc_embed = 32 
+# adepth = 4
+# num_heads = 4
+# acc_coords = 3
+# lr=0.001
+# wt_decay=1e-3
 
 
 
-# dataset = 'utd'
-# mocap_frames = 100
-# acc_frames = 100
-# num_joints = 20
-# num_classes = 27
+dataset = 'utd'
+mocap_frames = 50
+acc_frames = 100
+num_joints = 25
+num_classes = 27
 
 
 if dataset == 'ncrc':
@@ -66,7 +66,7 @@ if dataset == 'ncrc':
     test_generator = torch.utils.data.DataLoader(test_set, **params) #Each produced sample is 6000 x 229 x 3
 
 elif dataset == 'utd':
-    test_set = UTD_mm('data/UTD_MAAD/utd_test2p.npz',  batch_size=32)
+    test_set = UTD_mm('data/UTD_MAAD/utd_test_op_mf50.npz',  batch_size=32)
     test_generator = torch.utils.data.DataLoader(test_set, **params)
 
 else :                                                        
@@ -90,8 +90,9 @@ print("Initiating Model...")
 #teacher_model = ActTransformerAcc(adepth = 3,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = 2, num_classes=num_classes) 
 #teacher_model =MMTransformer(device=device, mocap_frames=mocap_frames, acc_frames=acc_frames,num_joints=num_joints,num_classes=num_classes)
 #teacher_model.load_state_dict(torch.load('exps/bmhad/bhmadmmd4h8_woKD_norandom.pt'))
-teacher_model = ActTransformerAcc(adepth = 3,num_classes=num_classes, acc_frames= acc_frames, num_joints =num_joints,has_features=False, num_heads=4, acc_embed = 32)
-teacher_model.load_state_dict(torch.load('exps/bmhad_KD/bmhad_KD.pt'))
+#teacher_model = ActTransformerAcc(adepth = 3,num_classes=num_classes, acc_frames= acc_frames, num_joints =num_joints,has_features=False, num_heads=4, acc_embed = 32)
+teacher_model = MMTransformer(device=device, mocap_frames=mocap_frames, acc_frames=acc_frames,num_joints=num_joints,num_classes=num_classes)
+teacher_model.load_state_dict(torch.load('exps/utd/utdmmd4h4_woKD_ef_op_mf50_batch4.pt'))
 teacher_model.to(device=device)
 
 # student_model.eval()

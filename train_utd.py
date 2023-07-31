@@ -43,10 +43,14 @@ max_epochs = 200
 print("Creating Data Generators...")
 #arguments
 dataset = 'utd'
-mocap_frames = 100
-acc_frames = 100
-num_joints = 20 
+mocap_frames = 50
+acc_frames = 150
+num_joints = 25
 num_classes = 27
+sdepth = 2
+tdepth = 2
+num_heads = 4
+
 
 #hyperparameters
 lr = 0.001
@@ -64,10 +68,10 @@ if dataset == 'ncrc':
     test_generator = torch.utils.data.DataLoader(test_set, **params) #Each produced sample is 6000 x 229 x 3
 
 else:
-    training_set = UTD_mm('data/UTD_MAAD/utd_train4p.npz', batch_size=params['batch_size'])
+    training_set = UTD_mm('data/UTD_MAAD/utd_train_op_mf50_acc150.npz', batch_size=params['batch_size'])
     training_generator = torch.utils.data.DataLoader(training_set, **params)
 
-    validation_set = UTD_mm('data/UTD_MAAD/utd_val2p.npz',  batch_size=params['batch_size'])
+    validation_set = UTD_mm('data/UTD_MAAD/utd_val_op_mf50_acc150.npz',  batch_size=params['batch_size'])
     validation_generator = torch.utils.data.DataLoader(validation_set, **params)
 
 
@@ -75,8 +79,8 @@ else:
 print("Initiating Model...")
 # model = ActTransformerMM(device = device, mocap_frames=mocap_frames, acc_frames=acc_frames, num_joints=num_joints, in_chans=3, acc_coords=3,
 #                                   acc_features=1, spatial_embed=16,has_features = False,num_classes=num_classes, num_heads=8)
-model = ActTransformerAcc(acc_embed=16,adepth = 4,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = 8, num_classes=num_classes)
-#model = MMTransformer(device=device, mocap_frames=mocap_frames, acc_frames=acc_frames,num_joints=num_joints,num_classes=num_classes)
+#model = ActTransformerAcc(acc_embed=16,adepth = 4,device= device, acc_frames= acc_frames, num_joints = num_joints,has_features=False, num_heads = 8, num_classes=num_classes)
+model = MMTransformer(device=device, mocap_frames=mocap_frames, acc_frames=acc_frames,num_joints=num_joints,num_classes=num_classes, sdepth=sdepth, tdepth=tdepth, adepth=tdepth, num_heads=num_heads)
 #model= ActRecogTransformer(device = device, mocap_frames=mocap_frames, acc_frames=acc_frames, num_classes = 27, num_joints=num_joints)
 parameters = sum(p.numel() for p in model.parameters() if p.requires_grad) 
 print(parameters)
@@ -193,8 +197,8 @@ for epoch in range(max_epochs):
         #         print(f'{item1} | {item2}')
         if best_accuracy < val_accuracy:
             best_accuracy = val_accuracy
-            torch.save(model.state_dict(),PATH+'utdmmd4h4_woKD_ef.pt')
-            print("Check point "+PATH+'utdmmd4h4_woKD_ef.pt'+ ' Saved!')
+            torch.save(model.state_dict(),PATH+'utdmmd4h4_woKD_ef_op_mf50_batch4.pt')
+            print("Check point "+PATH+'utdmmd4h4_woKD_ef_op_mf50_batch4.pt'+ ' Saved!')
 
     print(f"Epoch: {epoch},Valid accuracy:  {val_accuracy:6.2f} %, Valid loss:  {val_loss:8.5f}")
     epoch_loss_val.append(val_loss)
