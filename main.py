@@ -43,20 +43,10 @@ def get_args():
     parser.add_argument('--model' ,default= None, help = 'Name of Model to load')
 
     #model args
-    # parser.add_argument('--mocap-frames', default=600, type = int, help='Skeleton length')
-    # parser.add_argument('--acc-frames', default=256, type = int, help = 'Accelerometer length')
-    # parser.add_argument('--num-joints', default=31, type = int, help = 'Num joints in skeleton')
-    # parser.add_argument('--num-classes', default=11, type = int) 
-    # parser.add_argument('--acc-embed', default=32, type =int, help = 'Acceleromter embedding' )
-    # parser.add_argument('--adepth', default = 4, type = int)
-    # parser.add_argument('--num-heads', default= 4, type = int)]
-
-    #model args
     parser.add_argument('--device', nargs='+', default=[0], type = int)
     parser.add_argument('--model-args', default= str, help = 'A dictionary for model args')
     parser.add_argument('--weights', type = str, help = 'Location of weight file')
-    # parser.add_argument('--no-cuda', action = 'store_true', default = False, 
-    #                     help = 'disables CUDA training')
+    parser.add_argument('--model-saved-name', type = str, help = 'Weigt name', default='test')
 
     #dataloader 
     parser.add_argument('--feeder', default= None , help = 'Dataloader location')
@@ -119,7 +109,6 @@ class Trainer():
         self.load_model()
         self.load_optimizer()
         self.load_data()
-        self.arg.model_saved_name = 'test'
         if not os.path.exists(self.arg.work_dir):
             os.makedirs(self.arg.work_dir)
 

@@ -1,5 +1,7 @@
 #Model
 model: Models.model_acc_only.ActTransformerAcc
+# file name of weights 
+model_saved_name : no_kd_acc
 
 #model_args
 model_args:
