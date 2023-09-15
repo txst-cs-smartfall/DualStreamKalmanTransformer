@@ -57,6 +57,7 @@ def get_args():
     parser.add_argument('--train-feeder-args',default=str, help = 'A dict for dataloader args' )
     parser.add_argument('--val-feeder-args', default=str , help = 'A dict for validation data loader')
     parser.add_argument('--test_feeder_args',default=str, help= 'A dict for test data loader')
+    parser.add_argument('--include-val', type = str2bool, default= True , help = 'If we will have the validation set or not')
 
     #initializaiton
     parser.add_argument('--seed', type =  int , default = 2 , help = 'random seed (default: 1)') 
@@ -113,6 +114,7 @@ class Trainer():
         self.load_model()
         self.load_optimizer()
         self.load_data()
+        self.include_val = arg.include_val
         if not os.path.exists(self.arg.work_dir):
             os.makedirs(self.arg.work_dir)
 
@@ -237,6 +239,15 @@ class Trainer():
         )
         self.print_log('\tTime consumption: [Data]{dataloader}, [Network]{model}'.format(**proportion))
 
+        if not self.include_val and accuracy > self.best_accuracy:
+                state_dict = self.model.state_dict()
+                #weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in state_dict.items()])
+                torch.save(state_dict, self.arg.work_dir + '/' + self.arg.model_saved_name+ '.pt')
+                self.print_log('Weights Saved') 
+        
+        else: 
+            self.eval(epoch, loader_name='val', result_file=self.arg.result_file)
+
         #Still need to work with this one
         # if save_model:
         #     state_dict = self.model.state_dict()
@@ -307,9 +318,9 @@ class Trainer():
             self.print_log(f'# Parameters: {num_params}')
             for epoch in range(self.arg.start_epoch, self.arg.num_epoch):
                 self.train(epoch)
-                self.eval(epoch, loader_name='val', result_file=self.arg.result_file)
-            self.print_log(f'Best accuracy: {self.best_acc}')
-            self.print_log(f'Epoch number: {self.best_acc_epoch}')
+                
+            self.print_log(f'Best accuracy: {self.best_accuracy}')
+            # self.print_log(f'Epoch number: {self.best_acc_epoch}')
             self.print_log(f'Model name: {self.arg.work_dir}')
             self.print_log(f'Model total number of params: {num_params}')
             self.print_log(f'Weight decay: {self.arg.weight_decay}')
