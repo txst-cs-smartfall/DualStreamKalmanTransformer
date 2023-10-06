@@ -15,6 +15,10 @@ pip install -r requirements.txt
 - Model configuration for Accelerometer model is kept under ``config/utd/student.yaml`` and in ``config/utd/teacher.yaml`` for Multimodal model.
 
 ## Train and test
+Give execution access to ``train.sh`` with 
+```bash
+chmod +x ./train.sh
+```
 Run the ``train.sh`` to train and test the multimodal and accelerometer models. Log and weights would be saved under working directory. Use the following command to run the ``train.sh`` script.
 
 ```bash
