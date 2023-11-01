@@ -56,10 +56,10 @@ def bmhad_processing(data_dir = 'data/berkley_mhad', mode = 'train'):
     acc_set = []
     label_set = []
     acc_window_size = 32
-    acc_stride = 3
+    acc_stride = 10
 
-    skl_window_size = 512
-    skl_stride = 48
+    skl_window_size = 256
+    skl_stride = 160
 
     for idx, path in enumerate(file_paths):
         data = np.genfromtxt(path)
@@ -78,18 +78,17 @@ def bmhad_processing(data_dir = 'data/berkley_mhad', mode = 'train'):
         n,l, nc = processed_skl.shape
         processed_skl = processed_skl.reshape((n, l, -1, 3 ))
         sync_size = min(processed_skl.shape[0],processed_acc.shape[0])
-        skl_set.append(processed_skl[:sync_size, ::2, : , :])
+        skl_set.append(processed_skl[:sync_size, :, : , :])
         acc_set.append(processed_acc[:sync_size, : , :])
         label_set.append(np.repeat(label, sync_size))
     concat_acc = np.concatenate(acc_set, axis = 0)
     concat_skl = np.concatenate(skl_set, axis = 0)
     concat_label = np.concatenate(label_set, axis = 0)
-    print(np.unique(concat_label))
     dataset = { 'acc_data' : concat_acc,
                 'skl_data' : concat_skl,  
                 'labels': concat_label}
 
-    np.savez(file = f'/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/bhmad_sliding_{mode}', acc_data = concat_acc, skl_data = concat_skl, labels = concat_label )
+    np.savez(file = f'/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/bhmad_sliding_stride10_{mode}', acc_data = concat_acc, skl_data = concat_skl, labels = concat_label )
 
     return dataset
 
