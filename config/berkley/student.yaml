@@ -1,7 +1,8 @@
 #Model
-model: Models.ef_w_decoder.MMTransformer
-model_saved_name : berkley_convtransformer_slide10
-work_dir: exps/bhmad_woKD/MMNorm
+model: Models.model_acc_only.ActTransformerAcc
+# file name of weights 
+model_saved_name: student_sliding
+work_dir: exps/bhmad_woKD/acc_modal
 dataset: 'bmhad'
 
 
@@ -10,13 +11,13 @@ model_args:
   acc_frames : 32
   num_joints : 31
   num_classes : 11
-  spatial_embed : 64
-  #acc_embed: 16
+  #spatial_embed : 64
+  acc_embed: 64
   adepth : 2
-  sdepth : 2
+  #sdepth : 2
   num_heads : 4
-  mocap_frames: 256
-  num_patch: 16
+  #mocap_frames: 256
+  #num_patch: 16
   acc_coords: 3
 
 
