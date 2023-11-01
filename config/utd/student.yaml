@@ -1,44 +1,39 @@
 #Model
 model: Models.model_acc_only.ActTransformerAcc
 # file name of weights 
-model_saved_name : no_kd_acc
+work_dir: exps/UTD_woKD/acc_modal
+model_saved_name : student_sliding
 
-#model_args
 model_args:
-  acc_frames : 150
+  acc_frames : 128
   num_joints : 25 
   num_classes : 27
   acc_embed : 32 
-  adepth : 4
+  adepth : 2
   num_heads : 4
+  acc_coords: 6
   # mocap_frames: 50
 
 
-#optim
-weight_decay: 0.0004
-base_lr: 0.001
-
-
-# training
 batch_size: 16
 test_batch_size: 16
 val_batch_size : 16
-num_epoch: 200
+num_epoch: 25
 
 #dataloader
-feeder: Make_Dataset.UTD_mm
+feeder: Feeder.Make_Dataset.UTD_mm
 
 train_feeder_args:
-  npz_file: data/UTD_MAAD/utd_train_op_mf50_acc150.npz
+  # npz_file: data/UTD_MAAD/utd_train_op_mf50_norm.npz
   batch_size: 16
 
 val_feeder_args:
-  npz_file: data/UTD_MAAD/utd_val_op_mf50_acc150.npz
+  # npz_file: data/UTD_MAAD/utd_val_op_mf50_norm.npz
   batch_size: 16
 
 test_feeder_args: 
-  npz_file: data/UTD_MAAD/utd_test2p.npz
+  # npz_file: data/UTD_MAAD/utd_test_op_mf50_norm.npz
+  batch_size: 16
 
 seed: 2 
 optimizer: Adam
-
