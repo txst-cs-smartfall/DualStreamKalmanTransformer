@@ -21,6 +21,8 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from typing import List
 from sklearn.metrics import confusion_matrix, accuracy_score
+from sklearn.utils.class_weight import compute_sample_weight
+from sklearn.metrics import confusion_matrix, accuracy_score
 
 #local import 
 from Feeder.augmentation import TSFilpper

@@ -16,7 +16,7 @@ from tqdm import tqdm
 import warnings
 import json
 import torch.nn.functional as F
-from torchsummary import summary
+# from torchsummary import summary
 
 #local import 
 from Feeder.augmentation import TSFilpper
@@ -108,6 +108,7 @@ class Distiller(Trainer):
         self.criterion = {}
         if self.arg.phase == "train":
             self.model = {}
+            self.arg.model_args = arg.teacher_args
             self.load_model('teacher', arg.teacher_model, arg.teacher_args)
             self.load_weights(name='teacher', weight = self.arg.teacher_weight)
             teacher_params = self.count_parameters(self.model['teacher'])
@@ -149,6 +150,12 @@ class Distiller(Trainer):
                 weight_decay=self.arg.weight_decay
             )
         
+        elif self.arg.optimizer == "sgd":
+            self.optimizer = optim.SGD(
+                self.model[name].parameters(), 
+                lr = self.arg.base_lr,
+                weight_decay = self.arg.weight_decay
+            )
         else :
            raise ValueError()
 
@@ -180,9 +187,10 @@ class Distiller(Trainer):
         accuracy = 0
         cnt = 0
         train_loss = 0
+        print(type(loader))
         process = tqdm(loader, ncols = 80)
 
-        for batch_idx, (inputs, targets) in enumerate(process):
+        for batch_idx, (inputs, targets, idx) in enumerate(process):
             with torch.no_grad():
                 acc_data = inputs['acc_data'].cuda(self.output_device) #print("Input batch: ",inputs)
                 skl_data = inputs['skl_data'].cuda(self.output_device)
@@ -254,7 +262,7 @@ class Distiller(Trainer):
         
         process = tqdm(self.data_loader[loader_name], ncols=80)
         with torch.no_grad():
-            for batch_idx, (inputs, targets) in enumerate(process):
+            for batch_idx, (inputs, targets, idx) in enumerate(process):
                 label_list.extend(targets.tolist())
                 #inputs = inputs.cuda(self.output_device)
                 acc_data = inputs['acc_data'].cuda(self.output_device) #print("Input batch: ",inputs)

@@ -29,8 +29,8 @@ class MMTransformer(nn.Module):
         self.joint_coords = in_chans
         self.acc_frames = acc_frames
         self.acc_coords = acc_coords
-        self.skl_encode_size = (self.skl_patch//temp_embed)* (temp_embed//2)
-        
+        self.skl_encode_size = (self.skl_patch//(temp_embed//2))* (temp_embed)
+        print(self.skl_patch)
         #Spatial postional embedding
         # self.Spatial_pos_embed = nn.Parameter(torch.zeros((1, num_patch+1, spatial_embed)))
         self.temp_token = nn.Parameter(torch.zeros(1, 1, spatial_embed))
@@ -144,7 +144,7 @@ class MMTransformer(nn.Module):
         self.Spatial_norm = norm_layer(spatial_embed)
         self.Acc_norm = norm_layer(acc_embed)
         self.Temporal_norm = norm_layer(temp_embed)
-        self.intermediate_norm = nn.BatchNorm1d(9)
+        #self.intermediate_norm = nn.BatchNorm1d(9)
 
         #positional dropout 
         self.pos_drop = nn.Dropout(p = drop_rate)
@@ -181,6 +181,7 @@ class MMTransformer(nn.Module):
         #     x = rearrange(x, '(b f) Sa p  -> (b f) p Sa', b=b)
         # else: 
         #     x = self.Acc_coords_to_embedding(x)
+
         class_token = torch.tile(self.acc_token, (b,1,1))
         x = torch.cat((x, class_token), dim = 1)
         _,_,Sa = x.shape
@@ -261,10 +262,10 @@ class MMTransformer(nn.Module):
            
             x = blk(x) #output 3
             x= x + acc_data #merged both 3
-            x = self.intermediate_norm(x)
+            #x = self.intermediate_norm(x)
         x = self.Temporal_norm(x)
 
-        ###Extract Class token head from the output
+        ###Extract Class token head from the outputs
         if self.op_type=='cls':
             cls_token = x[:,1,:]
             cls_token = cls_token.view(b, -1) # (Batch_size, temp_embed)
@@ -284,6 +285,11 @@ class MMTransformer(nn.Module):
         skl_data = skl_data
         #Extract skeletal signal from input 
         #x = inputs[:,:, :self.num_joints , :self.joint_coords]
+        # acc_data = rearrange(acc_data, 'b f c -> b c f')
+        # acc_data = F.avg_pool1d(acc_data,(acc_data.shape[-1]//4)-1,stride=1,padding = 3, count_include_pad =True)
+        # acc_data = rearrange(acc_data, 'b c f -> b f c')
+
+        #
         x = rearrange(skl_data, 'b f j c -> b c f j')
         x = self.spatial_conv(x)
         x = rearrange(x, 'b c f j -> b f j c')
@@ -291,7 +297,12 @@ class MMTransformer(nn.Module):
         #x = rearrange(x, 'b f j c -> b np (j pl c)' , np = 10, pl = 5)
         x = rearrange(x, 'b t c -> b c t')
         x = self.Spatial_encoder(x)
+        spatial_out = F.avg_pool1d(x,x.shape[-1],stride=x.shape[-1]) #b x St x 1
+        b, St, _ = x.shape
+        spatial_out = torch.reshape(spatial_out, (b,St))
         x = rearrange(x, 'b c t -> b t c ')
+
+
         #Extract acc_signal from input 
         #sx = inputs[:, 0, self.num_joints:, :self.acc_coords]
         sx = acc_data
@@ -309,12 +320,10 @@ class MMTransformer(nn.Module):
         #Pass cls  token to temporal transformer
         # print(f'Class token {cls_token.shape}')
         # temp_cls_token = self.proj_up_clstoken(cls_token) # in b x mocap_frames * se -> #out: b x num_joints*Se
-        # temp_cls_token = torch.unsqueeze(temp_cls_token, dim = 1) #in: B x 1 x num_joints*Se
-         
+        # temp_cls_token = torch.unsqueeze(temp_cls_token, dim = 1) #in: B x 1 x num_joints*Se)
         x = self.Temp_forward_features(x, cv_signals) #in: B x mocap_frames x ()
-
+        x = x + sx 
         logits = self.class_head(x)
-
         return x , logits, F.log_softmax(logits,dim =1)
 
 
