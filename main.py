@@ -8,6 +8,7 @@ import time
 
 #environmental import
 import numpy as np 
+from einops import rearrange
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
@@ -16,13 +17,15 @@ from tqdm import tqdm
 import warnings
 import json
 import torch.nn.functional as F
-from torchsummary import summary
+#from torchsummary import summary
 import matplotlib.pyplot as plt
 from typing import List
+from sklearn.metrics import confusion_matrix, accuracy_score
 
 #local import 
 from Feeder.augmentation import TSFilpper
-from utils.dataprocessing import utd_processing , bmhad_processing,normalization
+from utils.dataprocessing import utd_processing , bmhad_processing, czu_processing,normalization
+from utils.dataset_loader import load_inertial_data, load_skeleton_data
 
 def get_args():
 
@@ -121,16 +124,17 @@ class Trainer():
     def __init__(self, arg):
         self.arg = arg
         # self.save_arg()
-        self.load_model(arg.model, arg.model_args)
+        if not os.path.exists(self.arg.work_dir):
+            os.makedirs(self.arg.work_dir)
+        self.model = self.load_model(arg.model, arg.model_args)
         self.load_loss()
         self.load_optimizer()
         self.load_data()
         self.include_val = arg.include_val
-        if not os.path.exists(self.arg.work_dir):
-            os.makedirs(self.arg.work_dir)
 
         if self.arg.phase == 'test':
-            self.load_weights(self.arg.weights)
+            # self.load_weights(self.arg.weights)
+            self.model.load_state_dict(torch.load(self.arg.weights))
         
         num_params = self.count_parameters(self.model)
         self.print_log(f'# Parameters: {num_params}')
@@ -144,10 +148,12 @@ class Trainer():
         use_cuda = torch.cuda.is_available()
         self.output_device = self.arg.device[0] if type(self.arg.device) is list else self.arg.device
         Model = import_class(model)
-        self.model = Model(**model_args).to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
+        model = Model(**model_args).to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
+        return model 
     
     def load_loss(self):
         criterion= import_class(self.arg.loss)
+        #self.criterion = torch.nn.NLLLoss()
         #loss_args = yaml.safe_load(arg.loss_args)
         self.criterion = criterion()
     
@@ -156,7 +162,7 @@ class Trainer():
     
     def load_optimizer(self):
         
-        if self.arg.optimizer == "Adam" :
+        if self.arg.optimizer == "adam" :
             self.optimizer = optim.Adam(
                 self.model.parameters(), 
                 lr = self.arg.base_lr,
@@ -168,14 +174,23 @@ class Trainer():
                 lr = self.arg.base_lr, 
                 weight_decay=self.arg.weight_decay
             )
-        elif self.arg.optimizer == "SGD":
+        elif self.arg.optimizer == "sgd":
             self.optimizer = optim.SGD(
                 self.model.parameters(), 
                 lr = self.arg.base_lr,
+                weight_decay = self.arg.weight_decay
             )
         
         else :
            raise ValueError()
+    
+    def distribution_viz( self,labels, work_dir, mode):
+        values, count = np.unique(labels, return_counts = True)
+        plt.bar(x = values,data = count, height = count)
+        plt.xlabel('Labels')
+        plt.ylabel('Count')
+        plt.savefig( work_dir + '/' + '{}_Label_Distribution'.format(mode.capitalize()))
+        plt.close()
         
     def load_data(self):
         Feeder = import_class(self.arg.feeder)
@@ -183,22 +198,76 @@ class Trainer():
         self.data_loader = dict()
         if self.arg.phase == 'train':
             if self.arg.dataset == 'utd':
-                train_data =  utd_processing(mode = self.arg.phase)
+                train_data =  utd_processing(mode = self.arg.phase, 
+                                             acc_window_size = self.arg.model_args['acc_frames'], 
+                                             skl_window_size = self.arg.model_args['spatial_embed'], 
+                                             num_windows = 15)
+
+                #self.distribution_viz(train_data['labels'], self.arg.work_dir, 'train')
                 norm_train, acc_scaler, skl_scaler =  normalization(data = train_data, mode = 'fit')
-                val_data =  utd_processing(mode = 'val')
-                norm_val, _, _ =  normalization(data = val_data,acc_scaler=acc_scaler,
-                                               skl_scaler=skl_scaler, mode = 'transform')
-            else:
+                val_data =  utd_processing(mode = 'test', 
+                                             acc_window_size = self.arg.model_args['acc_frames'], 
+                                             skl_window_size = self.arg.model_args['spatial_embed'], 
+                                             num_windows = 15)
+                norm_val, _, _ =  normalization(data = val_data,#acc_scaler=acc_scaler,
+                                               #skl_scaler=skl_scaler,
+                                                 mode = 'fit')
+                self.distribution_viz(val_data['labels'], self.arg.work_dir, 'val')
+
+                test_data =  utd_processing(mode = 'test', 
+                                            acc_window_size = self.arg.model_args['acc_frames'], 
+                                             skl_window_size = self.arg.model_args['spatial_embed'], 
+                                             num_windows = 15)
+                norm_test, _, _ =  normalization(data = test_data, mode = 'fit' )
+                self.distribution_viz(test_data['labels'], self.arg.work_dir, 'test')
+                self.data_loader['test'] = torch.utils.data.DataLoader(
+                    dataset=Feeder(**self.arg.test_feeder_args, dataset = norm_test),
+                    batch_size=self.arg.test_batch_size,
+                    shuffle=False,
+                    num_workers=self.arg.num_worker)
+            #elif self.arg.dataset == 'dmft':
+                
+            elif self.arg.dataset == 'bmhad':
                 #train_data = bmhad_processing(mode = arg.phase)
-                train_data = np.load('data/berkley_mhad/bhmad_sliding_stride10_train.npz')
+                train_data = np.load('data/berkley_mhad/bhmad_uniformdis_skl50_train.npz')
                 norm_train, acc_scaler, skl_scaler = normalization(data= train_data, mode = 'fit' )
+                self.distribution_viz(train_data['labels'], self.arg.work_dir, 'train')
                 #val_data  = bmhad_processing(mode = 'val')
-                val_data = np.load('data/berkley_mhad/bhmad_sliding_stride10_val.npz')
+                val_data = np.load('data/berkley_mhad/bhmad_uniformdis_skl50_val.npz')
                 norm_val, _, _ = normalization(data = val_data , mode = 'transform')
-            self.acc_scaler = acc_scaler
-            self.skl_scaler = skl_scaler
+                self.distribution_viz(val_data['labels'], self.arg.work_dir, 'val')
+            
+            elif self.arg.dataset == 'czu':
+                train_data = czu_processing(mode='train', acc_window_size = self.arg.model_args['acc_frames'],
+                                            skl_window_size=self.arg.model_args['spatial_embed'],
+                                            num_windows=15  )
+                
+                norm_train, acc_scaler, skl_scaler =  normalization(data=train_data, mode = 'fit')
+
+                val_data = czu_processing(mode='test', acc_window_size=self.arg.model_args['acc_frames'], 
+                                          skl_window_size=self.arg.model_args['spatial_embed'], 
+                                          num_windows=15)
+                norm_val, acc_scaler, skl_scaler =  normalization(data=val_data, mode = 'fit')
+                
+                norm_test = norm_val
+
+                self.data_loader['test'] = torch.utils.data.DataLoader(
+                    dataset=Feeder(**self.arg.test_feeder_args, dataset = norm_test),
+                    batch_size=self.arg.test_batch_size,
+                    shuffle=False,
+                    num_workers=self.arg.num_worker)
+
+
+            else: 
+                norm_train = torch.load('data/UTD_MAAD/utd_train.pt')
+                norm_val = torch.load('data/UTD_MAAD/utd_test.pt')
+
+
+            # self.acc_scaler = acc_scaler
+            # self.skl_scaler = skl_scaler
             self.data_loader['train'] = torch.utils.data.DataLoader(
                 dataset=Feeder(**self.arg.train_feeder_args,dataset = norm_train, transform =None),
+                #dataset = norm_train,
                 batch_size=self.arg.batch_size,
                 shuffle=True,
                 num_workers=self.arg.num_worker)
@@ -206,22 +275,32 @@ class Trainer():
             
             self.data_loader['val'] = torch.utils.data.DataLoader(
                 dataset=Feeder(**self.arg.val_feeder_args, dataset = norm_val),
+                #dataset = norm_val,
                 batch_size=self.arg.batch_size,
                 shuffle=True,
                 num_workers=self.arg.num_worker)
         else:
             if self.arg.dataset == 'utd':
-                test_data =  utd_processing(mode = 'test')
+                self.test_data =  utd_processing(mode = 'test', 
+                                            acc_window_size = self.arg.model_args['acc_frames'], 
+                                             skl_window_size = self.arg.model_args['spatial_embed'], 
+                                             num_windows = 15)
+                #self.distribution_viz(test_data['labels'], self.arg.work_dir, 'test')
+            elif self.arg.dataset == 'czu':
+                self.test_data =  utd_processing(mode = 'test', 
+                                acc_window_size = self.arg.model_args['acc_frames'], 
+                                    skl_window_size = self.arg.model_args['spatial_embed'], 
+                                    num_windows = 15)
             else:
-                test_data = np.load('data/berkley_mhad/bhmad_sliding_stride10_test.npz')
-
-            norm_test, _, _ =  normalization(data = test_data, mode = 'fit')
+                self.test_data = np.load('data/berkley_mhad/bhmad_uniformdis_skl50_test.npz')
+            self.distribution_viz(self.test_data['labels'], self.arg.work_dir, 'test')
+            norm_test, _, _ =  normalization(data = self.test_data, mode = 'fit')
             self.data_loader['test'] = torch.utils.data.DataLoader(
                 dataset=Feeder(**self.arg.test_feeder_args, dataset = norm_test),
                 batch_size=self.arg.test_batch_size,
-                shuffle=False,
+                shuffle=True,
                 num_workers=self.arg.num_worker)
-    
+            #self.distribution_viz(test_data['labels'], self.arg.work_dir, 'test')
 
 
     def record_time(self):
@@ -247,11 +326,50 @@ class Trainer():
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.savefig(self.arg.work_dir+'/'+'trainvsval.png')
+        plt.close()
+    
+    def cm_viz(self, y_pred : List[int], y_true : List[int]): 
+        cm = confusion_matrix(y_true, y_pred)
+        # plot the confusion matrix
+        plt.figure(figsize=(10,6))
+        plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+        plt.colorbar()
+        plt.xticks(np.unique(y_true))
+        plt.yticks(np.unique(y_true))
+        plt.xlabel("Predicted label")
+        plt.ylabel("True label")
+        plt.title("Confusion Matrix")
+        plt.savefig(self.arg.work_dir + '/' + 'Confusion Matrix')
+        plt.close()
+    
+    def wrong_pred_viz(self, wrong_idx: torch.Tensor):
+        wrong_label = self.test_data['labels'][wrong_idx]
+        wrong_label = wrong_label
+        labels, mis_count = np.unique(wrong_label, return_counts =True)
+        wrong_idx = np.array(wrong_idx)
+        plt.figure(figsize=(10,10))
+        for i in labels:
+            act_idx = wrong_idx[np.where(wrong_label == i)[0]]
+            count = 0
+            for j in range(5):
+                count += 1
+                # plt.subplot(i+1,j+1, count)
+                plt.xticks([])
+                plt.yticks([])
+                plt.grid(False)
+                trial_data = self.test_data['acc_data'][act_idx[j]]
+                plt.plot(trial_data)
+                plt.xlabel(i)     
+                plt.savefig(self.arg.work_dir + '/' +'wrong_predictions'+'/'+ 'Wrong_Pred' +str(i)+str(j))
+                plt.close()
+
+
 
     def train(self, epoch):
         self.model.train()
         self.record_time()
         loader = self.data_loader['train']
+        print(type(loader))
         timer = dict(dataloader = 0.001, model = 0.001, stats = 0.001)
         acc_value = []
         accuracy = 0
@@ -260,11 +378,18 @@ class Trainer():
 
         process = tqdm(loader, ncols = 80)
 
-        for batch_idx, (inputs, targets) in enumerate(process):
+        for batch_idx, (inputs, targets, idx) in enumerate(process):
+        # for batch_idx, [acc_data, skl_data, targets] in enumerate(process):
+ 
+            # print(data)
             with torch.no_grad():
                 acc_data = inputs['acc_data'].cuda(self.output_device) #print("Input batch: ",inputs)
                 skl_data = inputs['skl_data'].cuda(self.output_device)
                 targets = targets.cuda(self.output_device)
+                # acc_data = acc_data.long().cuda(self.output_device)
+                # skl_data = rearrange(skl_data, 'b f (j c) -> b f j c', c = 3, j = 20)
+                # skl_data = skl_data.long().cuda(self.output_device)
+                # targets = targets.cuda(self.output_device)
             
             timer['dataloader'] += self.split_time()
 
@@ -318,6 +443,8 @@ class Trainer():
             val_loss = self.eval(epoch, loader_name='val', result_file=self.arg.result_file)
             self.val_loss_summary.append(val_loss)
         
+        #test 
+
 
         #Still need to work with this one
         # if save_model:
@@ -329,7 +456,6 @@ class Trainer():
 
         if result_file is not None : 
             f_r = open (result_file, 'w')
-        
         self.model.eval()
 
         self.print_log('Eval epoch: {}'.format(epoch+1))
@@ -339,16 +465,21 @@ class Trainer():
         accuracy = 0
         label_list = []
         pred_list = []
+        wrong_idx = []
         
         process = tqdm(self.data_loader[loader_name], ncols=80)
         with torch.no_grad():
-            for batch_idx, (inputs, targets) in enumerate(process):
-                label_list.extend(targets.tolist())
-                #inputs = inputs.cuda(self.output_device)
+            for batch_idx, (inputs, targets, idx) in enumerate(process):
+            # for batch_idx, [acc_data, skl_data, targets] in enumerate(process):
                 acc_data = inputs['acc_data'].cuda(self.output_device) #print("Input batch: ",inputs)
                 skl_data = inputs['skl_data'].cuda(self.output_device)
                 targets = targets.cuda(self.output_device)
-
+                # acc_data = acc_data.long().cuda(self.output_device)
+                # skl_data = rearrange(skl_data, 'b f (j c) -> b f j c', c = 3, j = 20)
+                # skl_data = skl_data.long().cuda(self.output_device)
+                # targets = targets.cuda(self.output_device)
+                            
+                
                 #_,logits,predictions = self.model(inputs.float())
                 masks,logits,predictions = self.model(acc_data.float(), skl_data.float())
                 #logits = self.model(acc_data.float(), skl_data.float())
@@ -358,15 +489,20 @@ class Trainer():
                 #     slim_loss += sum([self.slim_penalty(m) for m in mask])
                 # batch_loss = bce_loss + (0.3*slim_loss)
                 batch_loss = self.criterion(masks, logits, targets)
+                #batch_loss = self.criterion(logits, targets)
                 loss += batch_loss.sum().item()
                 # accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
                 # pred_list.extend(torch.argmax(predictions ,1).tolist())
                 accuracy += (torch.argmax(F.log_softmax(logits,dim =1), 1) == targets).sum().item()
+                # wrong_pred = idx[torch.argmax(F.log_softmax(logits,dim =1), 1) == targets]
+                # wrong_idx.extend(wrong_pred.tolist())
+                label_list.extend(targets.tolist())
                 pred_list.extend(torch.argmax(F.log_softmax(logits,dim =1) ,1).tolist())
+                # print(len(pred_list))
                 cnt += len(targets)
             loss /= cnt
             accuracy *= 100./cnt
-        
+        # accuracy = accuracy_score(label_list, pred_list) * 100
         if result_file is not None:
             predict = pred_list
             true = label_list
@@ -380,9 +516,11 @@ class Trainer():
                     self.best_accuracy = accuracy
                     state_dict = self.model.state_dict()
                     #weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in state_dict.items()])
-                    torch.save(state_dict, self.arg.work_dir + '/' + self.arg.model_saved_name+ '.pt')
+                    torch.save(state_dict, self.arg.work_dir + '/' + self.arg.model_saved_name)
                     self.print_log('Weights Saved')
-        return loss        
+        else: 
+            return pred_list, label_list, wrong_idx
+        return loss       
 
     def start(self):
         #summary(self.model,[(model_args['acc_frames'],3), (model_args['mocap_frames'], model_args['num_joints'],3)] , dtypes=[torch.float, torch.float] )
@@ -394,7 +532,7 @@ class Trainer():
             self.global_step = self.arg.start_epoch * len(self.data_loader['train']) / self.arg.batch_size
             for epoch in range(self.arg.start_epoch, self.arg.num_epoch):
                 self.train(epoch)
-                
+            
             self.print_log(f'Best accuracy: {self.best_accuracy}')
             #self.print_log(f'Epoch number: {self.best_acc_epoch}')
             self.print_log(f'Model name: {self.arg.work_dir}')
@@ -404,11 +542,22 @@ class Trainer():
             self.print_log(f'Batch Size: {self.arg.batch_size}')
             self.print_log(f'seed: {self.arg.seed}')
             self.loss_viz(self.train_loss_summary, self.val_loss_summary)
+            
+            self.model = self.load_model(self.arg.model, self.arg.model_args)
+            self.load_loss()
+            self.load_optimizer()
+            self.model.load_state_dict(torch.load(self.arg.weights))
+            val_loss = self.eval(0, loader_name='test', result_file=self.arg.result_file)
+
         
         elif self.arg.phase == 'test' :
             if self.arg.weights is None: 
-                raise ValueError('Please appoint --weights')
-            loss = self.eval(epoch=0, loader_name='test', result_file=self.arg.result_file)
+                raise ValueError('Please add --weights')
+            y_pred, y_true, wrong_idx = self.eval(epoch=0, loader_name='test', result_file=self.arg.result_file)
+            self.cm_viz(y_pred, y_true)
+            #self.wrong_pred_viz(wrong_idx=wrong_idx)
+
+            
 
     # def save_arg(self):
     #     #save arg
