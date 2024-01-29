@@ -46,7 +46,7 @@ def process_data(raw_data, window_size, stride):
     data = sliding_window(raw_data, window_size - 1,raw_data.shape[0],window_size,stride)
     return data
 
-def bmhad_processing(data_dir = 'data/berkley_mhad', mode = 'train'):
+def bmhad_processing(data_dir = 'data/berkley_mhad', mode = 'train', acc_window_size = 32, skl_window_size = 32, num_windows = 10):
     file_paths = glob.glob(f'{data_dir}/{mode}_acc/*')
     skl_paths = f'{data_dir}/{mode}_skeleton/skl_'
     pattern = r's\d+_a\d+_r\d+'
@@ -55,11 +55,6 @@ def bmhad_processing(data_dir = 'data/berkley_mhad', mode = 'train'):
     skl_set =[]
     acc_set = []
     label_set = []
-    acc_window_size = 32
-    acc_stride = 10
-
-    skl_window_size = 256
-    skl_stride = 160
 
     for idx, path in enumerate(file_paths):
         data = np.genfromtxt(path)
@@ -67,12 +62,17 @@ def bmhad_processing(data_dir = 'data/berkley_mhad', mode = 'train'):
             continue
 
         acc_data = data[:, :3]
-
         desp = re.findall(pattern, file_paths[idx])[0]
         act_label = re.findall(act_pattern, path)[0]
         label = int(re.findall(label_pattern, act_label)[0])-1
         skl_file = skl_paths + desp + '.bvh'
         skl_data = bvh2arr(skl_file)
+        skl_data = skl_data[::15, :]
+        acc_stride = (acc_data.shape[0] - acc_window_size) // num_windows
+        skl_stride =(skl_data.shape[0] - skl_window_size) // num_windows
+        if acc_stride == 0 or skl_stride == 0:
+            print(path)
+            continue
         processed_acc = process_data(acc_data, acc_window_size, acc_stride)
         processed_skl = process_data(skl_data , skl_window_size, skl_stride)
         n,l, nc = processed_skl.shape
@@ -88,34 +88,110 @@ def bmhad_processing(data_dir = 'data/berkley_mhad', mode = 'train'):
                 'skl_data' : concat_skl,  
                 'labels': concat_label}
 
-    np.savez(file = f'/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/bhmad_sliding_stride10_{mode}', acc_data = concat_acc, skl_data = concat_skl, labels = concat_label )
+    np.savez(file = f'/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/bhmad_uniformdis_skl50_{mode}', acc_data = concat_acc, skl_data = concat_skl, labels = concat_label )
 
     return dataset
 
-
-
-def utd_processing(data_dir = 'data/UTD_MAAD', mode = 'val'):
+def sf_processing(data_dir = 'data/smartfallmm', mode = 'train',
+                    skl_window_size = 32, num_windows = 10,
+                    num_joints = 32, num_channels = 3):
     skl_set = []
-    acc_set = []
+    # acc_set = []
     label_set = []
 
-    file_paths = glob.glob(f'{data_dir}/{mode}_inertial/*.mat')
-    skl_path = f"{data_dir}/{mode}_skeleton_op/"
-    pattern = r'a\d+_s\d+_t\d+'
-    act_pattern = r'(a\d+)'
+    file_paths = glob.glob(f'{data_dir}/{mode}/skeleton/*.csv')
+    print("file paths {}".format(len(file_paths)))
+    #skl_path = f"{data_dir}/{mode}_skeleton_op/"
+    #skl_path = f"{data_dir}/{mode}/skeleton/"
+    pattern = r'S\d+A\d+T\d+'
+    act_pattern = r'(A\d+)'
     label_pattern = r'(\d+)'
-    acc_window_size = 128
-    acc_stride = 10
-    skl_window_size = 32
-    skl_stride = 3
     for idx,path in enumerate(file_paths):
         desp = re.findall(pattern, file_paths[idx])[0]
         act_label = re.findall(act_pattern, path)[0]
         label = int(re.findall(label_pattern, act_label)[0])-1
-        acc_data = loadmat(path)['d_iner']
+
+        # acc_data = loadmat(path)['sensor'][1][0]
+
+        # acc_stride = (acc_data.shape[0] - acc_window_size) // num_windows
+        # acc_data = acc_data[::2, :-1]
+        # processed_acc = process_data(acc_data, acc_window_size, acc_stride)
+        skl_df  = pd.read_csv(path)
+        if skl_df.shape[1] > 97:
+            continue
+        skl_data = skl_df.iloc[: , 1:]
+        #skl_data = np.delete(skl_data, np.s_[3::4], axis = 1)
+
+        skl_data = rearrange(skl_data.values, 't (j c) -> t j c' , j = num_joints, c = num_channels)
+        
+        skl_stride =(skl_data.shape[0] - skl_window_size) // num_windows
+        # if acc_stride <= 0 or skl_stride <= 0:
+        #     print(path)
+        #     continue
+        #skl_data = np.squeeze(np.load(skl_file))
+        t, j , c = skl_data.shape
+        skl_data = rearrange(skl_data, 't j c -> t (j c)')
+        processed_skl = process_data(skl_data, skl_window_size, skl_stride)
+        skl_data = rearrange(processed_skl, 'n t (j c) -> n t j c', j =j, c =c)
+        # sync_size = min(skl_data.shape[0],processed_acc.shape[0])
+        skl_set.append(skl_data[:, :, : , :])
+        # acc_set.append(processed_acc[:sync_size, : , :])
+        label_set.append(np.repeat(label, skl_data.shape[0]))
+
+    # concat_acc = np.concatenate(acc_set, axis = 0)
+    concat_skl = np.concatenate(skl_set, axis = 0)
+    concat_label = np.concatenate(label_set, axis = 0)
+    _,count  = np.unique(concat_label, return_counts = True)
+    dataset = { 'acc_data' : {},
+                'skl_data' : concat_skl, 
+                'labels': concat_label}
+    
+    return dataset
+
+
+def czu_processing(data_dir = 'data/CZU-MHAD', mode = 'train',
+                    acc_window_size = 32, skl_window_size = 32, num_windows = 10,
+                    num_joints = 25, num_channels = 3):
+    skl_set = []
+    acc_set = []
+    label_set = []
+
+    file_paths = glob.glob(f'{data_dir}/{mode}/inertial/*.mat')
+    print("file paths {}".format(len(file_paths)))
+    #skl_path = f"{data_dir}/{mode}_skeleton_op/"
+    skl_path = f"{data_dir}/{mode}/skeleton/"
+    pattern = r'\w+_a\d+_t\d+'
+    act_pattern = r'(a\d+)'
+    label_pattern = r'(\d+)'
+    for idx,path in enumerate(file_paths):
+        desp = re.findall(pattern, file_paths[idx])[0]
+        act_label = re.findall(act_pattern, path)[0]
+        label = int(re.findall(label_pattern, act_label)[0])-1
+        # if label in [0, 1, 2, 3, 4, 5, 6, 7, 14, 15, 16, 17,18,19,23,24]:
+        #     acc_stride = 4
+        #     skl_stride = 1
+        # else: 
+        #     acc_stride = 10
+        #     skl_stride = 3
+        acc_data = loadmat(path)['sensor'][1][0]
+
+        acc_stride = (acc_data.shape[0] - acc_window_size) // num_windows
+        acc_data = acc_data[::2, :-1]
+        # print(acc_stride)
         processed_acc = process_data(acc_data, acc_window_size, acc_stride)
-        skl_file = skl_path+desp+'_color_skeleton.npy'
-        skl_data = np.squeeze(np.load(skl_file))
+        # print(label)
+        # print(processed_acc.shape)
+        # skl_file = skl_path+desp+'_color_skeleton.npy'
+        skl_data = loadmat( skl_path+desp+'.mat')['skeleton']
+        skl_data = np.delete(skl_data, np.s_[3::4], axis = 1)
+
+        skl_data = rearrange(skl_data, 't (j c) -> t j c' , j = num_joints, c = num_channels)
+        
+        skl_stride =(skl_data.shape[0] - skl_window_size) // num_windows
+        if acc_stride <= 0 or skl_stride <= 0:
+            print(path)
+            continue
+        #skl_data = np.squeeze(np.load(skl_file))
         t, j , c = skl_data.shape
         skl_data = rearrange(skl_data, 't j c -> t (j c)')
         processed_skl = process_data(skl_data, skl_window_size, skl_stride)
@@ -128,6 +204,66 @@ def utd_processing(data_dir = 'data/UTD_MAAD', mode = 'val'):
     concat_acc = np.concatenate(acc_set, axis = 0)
     concat_skl = np.concatenate(skl_set, axis = 0)
     concat_label = np.concatenate(label_set, axis = 0)
+    _,count  = np.unique(concat_label, return_counts = True)
+    dataset = { 'acc_data' : concat_acc,
+                'skl_data' : concat_skl, 
+                'labels': concat_label}
+    
+    return dataset
+
+
+def utd_processing(data_dir = 'data/UTD_MAAD', mode = 'val', acc_window_size = 32, skl_window_size = 32, num_windows = 10):
+    skl_set = []
+    acc_set = []
+    label_set = []
+
+    file_paths = glob.glob(f'{data_dir}/{mode}_inertial/*.mat')
+    print("file paths {}".format(len(file_paths)))
+    #skl_path = f"{data_dir}/{mode}_skeleton_op/"
+    skl_path = f"{data_dir}/{mode}_skeleton/"
+    pattern = r'a\d+_s\d+_t\d+'
+    act_pattern = r'(a\d+)'
+    label_pattern = r'(\d+)'
+    for idx,path in enumerate(file_paths):
+        desp = re.findall(pattern, file_paths[idx])[0]
+        act_label = re.findall(act_pattern, path)[0]
+        label = int(re.findall(label_pattern, act_label)[0])-1
+        # if label in [0, 1, 2, 3, 4, 5, 6, 7, 14, 15, 16, 17,18,19,23,24]:
+        #     acc_stride = 4
+        #     skl_stride = 1
+        # else: 
+        #     acc_stride = 10
+        #     skl_stride = 3
+        acc_data = loadmat(path)['d_iner']
+
+        acc_stride = (acc_data.shape[0] - acc_window_size) // num_windows
+        acc_data = acc_data[::2, :]
+        # print(acc_stride)
+        processed_acc = process_data(acc_data, acc_window_size, acc_stride)
+        # print(label)
+        # print(processed_acc.shape)
+        # skl_file = skl_path+desp+'_color_skeleton.npy'
+        skl_data = loadmat( skl_path+desp+'_skeleton.mat')['d_skel']
+        skl_data = rearrange(skl_data, 'j c t -> t j c')
+        
+        skl_stride =(skl_data.shape[0] - skl_window_size) // num_windows
+        if acc_stride == 0 or skl_stride == 0:
+            print(path)
+            continue
+        #skl_data = np.squeeze(np.load(skl_file))
+        t, j , c = skl_data.shape
+        skl_data = rearrange(skl_data, 't j c -> t (j c)')
+        processed_skl = process_data(skl_data, skl_window_size, skl_stride)
+        skl_data = rearrange(processed_skl, 'n t (j c) -> n t j c', j =j, c =c)
+        sync_size = min(skl_data.shape[0],processed_acc.shape[0])
+        skl_set.append(skl_data[:sync_size, :, : , :])
+        acc_set.append(processed_acc[:sync_size, : , :])
+        label_set.append(np.repeat(label, sync_size))
+
+    concat_acc = np.concatenate(acc_set, axis = 0)
+    concat_skl = np.concatenate(skl_set, axis = 0)
+    concat_label = np.concatenate(label_set, axis = 0)
+    _,count  = np.unique(concat_label, return_counts = True)
     dataset = { 'acc_data' : concat_acc,
                 'skl_data' : concat_skl, 
                 'labels': concat_label}
@@ -163,6 +299,7 @@ def normalization(data_path = None,data = None,  new_path = None, acc_scaler = S
 
 
 if __name__ == "__main__":
-    bmhad_processing(data_dir= '/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/')
-    bmhad_processing(data_dir= '/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/',mode = 'val')
-    bmhad_processing(data_dir= '/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/',mode = 'test')
+    # bmhad_processing(data_dir= '/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/',  acc_window_size = 50, skl_window_size = 50)
+    # bmhad_processing(data_dir= '/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/',mode = 'val', acc_window_size = 50, skl_window_size = 50)
+    # bmhad_processing(data_dir= '/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/',mode = 'test', acc_window_size = 50, skl_window_size = 50)
+    dataset = sf_processing()
