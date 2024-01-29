@@ -33,7 +33,7 @@ class PredictorLG(nn.Module):
     """
     def __init__(self, embed_dim=384):
         super().__init__()
-        self.score_nets = nn.ModuleList([nn.Sequential(
+        self.score_nets = nn.Sequential(
             nn.LayerNorm(embed_dim),
             nn.Linear(embed_dim, embed_dim),
             nn.GELU(),
@@ -43,12 +43,11 @@ class PredictorLG(nn.Module):
             nn.GELU(),
             nn.Linear(embed_dim // 4, 2),
             nn.LogSoftmax(dim=-1))
-        for _ in range(2)])
         #should change the 2 here to dynamic 
     def forward(self, x):
         out = []
         for i in range(2):
-            score = self.score_nets[i](x[i])
+            score = self.score_nets(x[i])
             out.append(score)  
         return out
 

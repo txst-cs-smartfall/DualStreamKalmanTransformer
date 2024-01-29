@@ -56,15 +56,6 @@ Jinja2==3.1.2
 joblib==1.2.0
 jsonpointer==2.3
 jsonschema==4.17.3
-jupyter==1.0.0
-jupyter_client==8.0.2
-jupyter-console==6.4.4
-jupyter_core==5.2.0
-jupyter-events==0.6.3
-jupyter_server==2.1.0
-jupyter_server_terminals==0.4.4
-jupyterlab-pygments==0.2.2
-jupyterlab-widgets==3.0.5
 kiwisolver==1.4.4
 loguru==0.7.0
 Mako==1.2.4
@@ -147,9 +138,6 @@ threadpoolctl==3.1.0
 timm==0.6.12
 tinycss2==1.2.1
 toml==0.10.2
-torch==1.8.1
-torchaudio==0.8.0a0+e4e171a
-torchvision==0.9.1
 tornado==6.2
 tqdm==4.64.1
 traitlets==5.9.0

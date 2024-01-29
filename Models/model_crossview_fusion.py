@@ -8,6 +8,7 @@ import math
 import logging
 from functools import partial
 from collections import OrderedDict
+# from this import s
 from einops import rearrange, repeat
 import numpy as np
 import torch
@@ -16,11 +17,11 @@ import torch.nn.functional as F
 from .model_utils import Block
 
 
-class ActTransformerMM(nn.Module):
-    def __init__(self, device='cpu' , mocap_frames=600, acc_frames=150, num_joints=29, in_chans=3, acc_coords=3,has_features =False, acc_features=18, spatial_embed=32,
+class ActRecogTransformer(nn.Module):
+    def __init__(self, device='cpu' , mocap_frames=600, acc_frames=150, num_joints=29, in_chans=3, acc_coords=3, acc_features=18, spatial_embed=32,
                  sdepth=4, adepth=4, tdepth=4, num_heads=8, mlp_ratio=2., qkv_bias=True,
                  qk_scale=None, op_type='cls', embed_type='lin', fuse_acc_features=False,
-                 drop_rate=0.2, attn_drop_rate=0.2, drop_path_rate=0.2,  norm_layer=None, num_classes=6):
+                 drop_rate=0., attn_drop_rate=0., drop_path_rate=0.2,  norm_layer=None, num_classes=6):
 
         """    ##########hybrid_backbone=None, representation_size=None,
         Args:
@@ -102,7 +103,6 @@ class ActTransformerMM(nn.Module):
         self.acc_token = nn.Parameter(torch.zeros(1,1,acc_embed))
         self.acc_frames = acc_frames
         self.adepth = adepth
-        self.has_features = has_features
         self.acc_features = acc_features
         self.fuse_acc_features = fuse_acc_features
         self.acc_coords = acc_coords
@@ -268,42 +268,39 @@ class ActTransformerMM(nn.Module):
             return x #b x St
 
 
-    def forward(self, inputs):
+    def forward(self, acc_data, skl_data):
         #Input: B x MOCAP_FRAMES X  119 x 3
-        b,_,_,c = inputs.shape
+        b,_,_,c = skl_data.shape
 
         #Extract skeletal signal from input
-        x = inputs[:,:, :self.num_joints, :self.joint_coords] #B x Fs x num_joints x 3
+        x = skl_data #B x Fs x num_joints x 3
         
         #Extract acc signal from input
-        if self.has_features: 
-            sxf = inputs[:, 0, self.num_joints:self.num_joints+self.acc_features, 0 ] #B x 1 x acc_features x 1
-            sx = inputs[:, 0 , self.num_joints+self.acc_features:, :self.acc_coords] #B x 1 x Fa x 3
-            sxf = self.acc_features_embed(sxf)
-            
-        else:
-            sx = inputs[:, 0 , self.num_joints:, :self.acc_coords]
+        #sxf = acc_data #B x 1 x acc_features x 1
+        sx = acc_data #B x 1 x Fa x 3
         sx = torch.reshape(sx, (b,-1,1,self.acc_coords) ) #B x Fa x 1 x 3
         
 
         #Get acceleration features
         sx,cv_signals = self.Acc_forward_features(sx) #in: F x Fa x 3 x 1,  op: B x St
-        if self.fuse_acc_features:
-            sx+= sxf #Add the features signal to acceleration signal
+        # sxf = self.acc_features_embed(sxf)
+        # if self.fuse_acc_features:
+        #     sx+= sxf #Add the features signal to acceleration signal
         
         #Get skeletal features 
         x,cls_token = self.Spatial_forward_features(x) #in: B x Fs x num_joints x 3 , op: B x Fs x (num_joints*Se)
+
         #Pass cls token to temporal transformer
         temp_cls_token = self.proj_up_clstoken(cls_token) #in: B x mocap_frames * Se -> op: B x num_joints*Se
         temp_cls_token = torch.unsqueeze(temp_cls_token,dim=1) #op: B x 1 x num_joints*Se
         
+
         x = self.Temp_forward_features(x,temp_cls_token,cv_signals) #in: B x Fs x (num_joints*Se) , op: B x St
+
         
         #Concat features along frame dimension
         x += sx #torch.cat((x,sx), dim=1)
-        out = x 
-        logits = self.class_head(x)
+        x = self.class_head(x)
 
-        return out, logits, F.log_softmax(logits,dim=1)
-
+        return sx, x, F.log_softmax(x,dim=1)
 

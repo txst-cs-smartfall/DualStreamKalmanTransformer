@@ -6,7 +6,7 @@ import random
 import torch.nn.functional as F
 import scipy.stats as s
 from einops import rearrange
-from tsaug import TimeWarp, Reverse, Drift, AddNoise
+#from tsaug import TimeWarp, Reverse, Drift, AddNoise
 
 
 #################### MAIN #####################
@@ -89,7 +89,7 @@ class Bmhad_mm(torch.utils.data.Dataset):
         label = self.labels[index]
         label = torch.tensor(label)
         label = label.long()
-        return data, label
+        return data, label, index
     
 
 class UTD_mm(torch.utils.data.Dataset):
@@ -145,5 +145,15 @@ class UTD_mm(torch.utils.data.Dataset):
         #data, label = self.transform(data, label)
         label = torch.tensor(label)
         label = label.long()
-        return data, label
+        return data, label, index
 
+class UTD_aus(torch.utils.data.Dataset):
+    def __init__(self):
+        acc_data = torch.load('/home/bgu9/DMFT_wrapup/si/train/large_train_1_inertial_Data_subjects.pt')
+        skl_data = torch.load('/home/bgu9/DMFT_wrapup/si/train/large_train_1_skeleton_Data_subjects.pt')
+        print(acc_data.shape)
+        print(skl_data.shape)
+
+
+if __name__ == "__main__":
+    loader = UTD_aus()

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from .model_utils import Block ,PredictorLG, TokenExchange
 
 class MMTransformer(nn.Module):
-    def __init__(self, device = 'cpu', mocap_frames= 600, acc_frames = 256, num_joints = 31, in_chans = 3, num_patch = 10 ,  acc_coords = 3, spatial_embed = 32, acc_embed = 32, sdepth = 4, adepth = 4, tdepth = 4, num_heads = 8, mlp_ratio = 2, qkv_bias = True, qk_scale = None, op_type = 'all', embed_type = 'lin', drop_rate =0.2, attn_drop_rate = 0.2, drop_path_rate = 0.2, norm_layer = None, num_classes =11):
+    def __init__(self, device = 'cpu', mocap_frames= 600, acc_frames = 256, num_joints = 31, in_chans = 3, num_patch = 10 ,  acc_coords = 3, spatial_embed = 32, acc_embed = 32, sdepth = 4, adepth = 4, tdepth = 4, num_heads = 8, mlp_ratio = 2, qkv_bias = True, qk_scale = None, op_type = 'all', embed_type = 'lin', drop_rate =0.2, attn_drop_rate = 0.1, drop_path_rate = 0.1, norm_layer = None, num_classes =11):
         super().__init__()
         norm_layer = partial(nn.LayerNorm, eps = 1e-6)
 
@@ -19,9 +19,9 @@ class MMTransformer(nn.Module):
         self.num_patch = num_patch
         self.mocap_frames = mocap_frames
         self.skl_patch_size = mocap_frames // num_patch
-        print(self.skl_patch_size)
+        #print(self.skl_patch_size)
         self.skl_patch = self.skl_patch_size * num_joints
-        print(self.skl_patch)
+        #print(self.skl_patch)
         self.acc_patch_size = acc_frames // num_patch
         self.temp_frames = mocap_frames
         self.op_type = op_type
@@ -33,8 +33,9 @@ class MMTransformer(nn.Module):
         self.joint_coords = in_chans
         self.acc_frames = acc_frames
         self.acc_coords = acc_coords
-        self.skl_encode_size = (self.skl_patch//50)*64
+        self.skl_encode_size = (self.skl_patch//(temp_embed//2))* (temp_embed)
         print(self.skl_encode_size)
+        #print(self.skl_encode_size)
         
         #Spatial postional embedding
         # self.Spatial_pos_embed = nn.Parameter(torch.zeros((1, num_patch+1, spatial_embed)))
@@ -107,7 +108,7 @@ class MMTransformer(nn.Module):
 
         # )
         self.Spatial_encoder = nn.Sequential(
-            nn.Conv1d(36, self.skl_encode_size, 3, 1, 1), 
+            nn.Conv1d(84, self.skl_encode_size, 3, 1, 1), 
             nn.BatchNorm1d((self.skl_encode_size)), 
             nn.ReLU(), 
             nn.Conv1d(self.skl_encode_size ,self.skl_encode_size//2 , 3, 1, 1),
@@ -154,8 +155,8 @@ class MMTransformer(nn.Module):
 
 
         self.class_head = nn.Sequential(
-            nn.LayerNorm(self.acc_embed),
-            nn.Linear(self.acc_embed, num_classes)
+            nn.LayerNorm(self.acc_embed*2),
+            nn.Linear(self.acc_embed*2, num_classes)
         )
         
         # self.spatial_frame_reduce = nn.Conv1d(self.mocap_frames, self.acc_frames, 1,1)
@@ -171,7 +172,7 @@ class MMTransformer(nn.Module):
         self.spatial_conv = nn.Sequential(nn.Conv2d(in_chans, in_chans, (1, 9), 1 ),
                                           nn.BatchNorm2d(in_chans),
                                           nn.ReLU(), 
-                                          nn.Conv2d(in_chans, in_chans//2, (1, 9), 1), 
+                                          nn.Conv2d(in_chans, in_chans//2, (1, 3), 1), 
                                           nn.BatchNorm2d(in_chans//2),
                                           nn.ReLU() )
         
@@ -275,7 +276,6 @@ class MMTransformer(nn.Module):
         ###Extract Class token head from the output
         if self.op_type=='cls':
             cls_token = x[:,1,:]
-            print(cls_token)
             cls_token = cls_token.view(b, -1) # (Batch_size, temp_embed)
             return cls_token
 
@@ -313,14 +313,14 @@ class MMTransformer(nn.Module):
             mask = [F.softmax(score_.reshape(b, -1, 2), dim=2)[:, :, 0] for score_ in scores]
 
             masks.append([mask_.flatten() for mask_ in mask])
-            acc_data, skl_data = self.exchange_net[idx]([acc_data, down_skl], mask, 0.2)
+            acc_data, skl_data = self.exchange_net[idx]([acc_data, down_skl], mask, 0.04)
             if idx != self.adepth-1:
                 skl_data = self.up_samp[idx](skl_data)
 
-        x = acc_data + skl_data
+        x = torch.cat((acc_data , skl_data), dim = -1)
 
         if self.op_type=='cls':
-            cls_token = x[:,1,:]
+            cls_token = x[:,0,:]
             cls_token = cls_token.view(b, -1) # (Batch_size, temp_embed)
             return masks, cls_token
 
@@ -328,7 +328,7 @@ class MMTransformer(nn.Module):
             x = x[:,:f,:]
             x = rearrange(x, 'b f St -> b St f')
             x = F.avg_pool1d(x,x.shape[-1],stride=x.shape[-1]) #b x St x 1
-            x = torch.reshape(x, (b,St))
+            x = torch.reshape(x, (b,St*2))
             return masks,x #b x St 
 
     def forward(self, acc_data, skl_data):
