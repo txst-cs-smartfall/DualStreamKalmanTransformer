@@ -165,13 +165,12 @@ class ActRecogTransformer(nn.Module):
             return x #b x St
 
 
-    def forward(self, inputs):
+    def forward(self,  acc_data, skl_data):
         #Input: B x MOCAP_FRAMES X  149 x 3
-        b,_,_,c = inputs.shape
+        # b,_,_,c = inputs.shape
 
         #Extract skeletal signal from input
-        x = inputs[:,:, :self.num_joints, :self.joint_coords] #B x Fs x num_joints x 3
-        
+        x = skl_data #B x Fs x num_joints x 3
         
         #Get skeletal features 
         x,cls_token = self.Spatial_forward_features(x) #in: B x Fs x num_joints x 3 , op: B x Fs x (num_joints*Se)
@@ -185,6 +184,5 @@ class ActRecogTransformer(nn.Module):
         #Concat features along frame dimension
         out = x
         logits = self.class_head(x)
-
         return out, logits, F.log_softmax(logits,dim=1)
 
