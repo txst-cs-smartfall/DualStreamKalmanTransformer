@@ -26,7 +26,7 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 
 #local import 
 from Feeder.augmentation import TSFilpper
-from utils.dataprocessing import utd_processing , bmhad_processing, czu_processing,normalization
+from utils.dataprocessing import utd_processing , bmhad_processing, czu_processing, sf_processing,normalization
 from utils.dataset_loader import load_inertial_data, load_skeleton_data
 
 def get_args():
@@ -259,6 +259,26 @@ class Trainer():
                     shuffle=False,
                     num_workers=self.arg.num_worker)
 
+            elif self.arg.dataset == 'smartfallmm':
+
+                train_data = sf_processing(mode = 'train',
+                                            skl_window_size=self.arg.model_args['spatial_embed'], 
+                                            num_windows = 10)
+                
+                norm_train, acc_scaler, skl_scaler =  normalization(data=train_data, mode = 'fit')
+
+                val_data = sf_processing(mode='test', 
+                                          skl_window_size=self.arg.model_args['spatial_embed'], 
+                                          num_windows=10)
+                norm_val, acc_scaler, skl_scaler =  normalization(data=val_data, mode = 'fit')
+                
+                norm_test = norm_val
+
+                self.data_loader['test'] = torch.utils.data.DataLoader(
+                    dataset=Feeder(**self.arg.test_feeder_args, dataset = norm_test),
+                    batch_size=self.arg.test_batch_size,
+                    shuffle=False,
+                    num_workers=self.arg.num_worker)
 
             else: 
                 norm_train = torch.load('data/UTD_MAAD/utd_train.pt')
@@ -371,7 +391,6 @@ class Trainer():
         self.model.train()
         self.record_time()
         loader = self.data_loader['train']
-        print(type(loader))
         timer = dict(dataloader = 0.001, model = 0.001, stats = 0.001)
         acc_value = []
         accuracy = 0

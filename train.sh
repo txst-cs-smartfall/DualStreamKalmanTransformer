@@ -1,6 +1,6 @@
 #!/bin/bash
-weights="czu_accwKD.pt"
-work_dir="exps/czu_woKD/distillation"
+weights="smartfallmm_skeleton.pt"
+work_dir="exps/smartfallmm/skeleton"
 result_file="result.txt"
 
 # weights="berkley_best.pt"
@@ -26,4 +26,7 @@ result_file="result.txt"
 #python3 distiller.py --config ./config/utd/distill.yaml --weights exps/UTD_wKD/MMNorm/test.pt --device 0 --base-lr 2.5e-3 --phase 'test'
 
 #czu 
-python3 distiller.py --config ./config/czu/distill.yaml --work-dir $work_dir --model-saved-name $weights  --weights $work_dir/$weights --device 3 --base-lr 2.5e-3 --include-val True
+#python3 distiller.py --config ./config/czu/distill.yaml --work-dir $work_dir --model-saved-name $weights  --weights $work_dir/$weights --device 3 --base-lr 2.5e-3 --include-val True
+
+#smartfallmm
+python3 main.py --config ./config/smartfallmm/teacher.yaml --work-dir $work_dir --model-saved-name $weights  --weights $work_dir/$weights --device 6 --base-lr 2.5e-3 --include-val True
