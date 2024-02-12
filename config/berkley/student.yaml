@@ -1,18 +1,18 @@
 #Model
 model: Models.model_acc_only.ActTransformerAcc
 # file name of weights 
-model_saved_name: student_sliding
-work_dir: exps/bhmad_woKD/acc_modal
+# model_saved_name: student_sliding
+# work_dir: exps/bhmad_woKD/acc_modal
 dataset: 'bmhad'
 
 
 #model_args
 model_args:
-  acc_frames : 32
+  acc_frames : 50
   num_joints : 31
   num_classes : 11
   #spatial_embed : 64
-  acc_embed: 64
+  acc_embed: 32
   adepth : 2
   #sdepth : 2
   num_heads : 4
@@ -30,9 +30,8 @@ weight_decay: 0.004
 batch_size: 64
 test_batch_size: 64
 val_batch_size : 64
-num_epoch: 20
-
-#dataloader
+num_epoch: 250
+#dataloade
 feeder: Feeder.Make_Dataset.Bmhad_mm
 
 train_feeder_args:
@@ -45,4 +44,4 @@ test_feeder_args:
   batch_size: 64
 
 seed: 2 
-optimizer: Adam
+optimizer: sgd

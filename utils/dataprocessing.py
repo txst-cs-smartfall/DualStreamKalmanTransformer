@@ -88,7 +88,7 @@ def bmhad_processing(data_dir = 'data/berkley_mhad', mode = 'train', acc_window_
                 'skl_data' : concat_skl,  
                 'labels': concat_label}
 
-    np.savez(file = f'/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/bhmad_uniformdis_skl50_{mode}', acc_data = concat_acc, skl_data = concat_skl, labels = concat_label )
+    #np.savez(file = f'/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/bhmad_uniformdis_skl50_{mode}', acc_data = concat_acc, skl_data = concat_skl, labels = concat_label )
 
     return dataset
 
@@ -175,7 +175,7 @@ def czu_processing(data_dir = 'data/CZU-MHAD', mode = 'train',
         # else: 
         #     acc_stride = 10
         #     skl_stride = 3
-        acc_data = loadmat(path)['sensor'][1][0]
+        acc_data = loadmat(path)['sensor'][3][0]
 
         acc_stride = (acc_data.shape[0] - acc_window_size) // num_windows
         acc_data = acc_data[::2, :-1]
@@ -303,5 +303,5 @@ def normalization(data_path = None,data = None,  new_path = None, acc_scaler = S
 if __name__ == "__main__":
     # bmhad_processing(data_dir= '/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/',  acc_window_size = 50, skl_window_size = 50)
     # bmhad_processing(data_dir= '/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/',mode = 'val', acc_window_size = 50, skl_window_size = 50)
-    # bmhad_processing(data_dir= '/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/',mode = 'test', acc_window_size = 50, skl_window_size = 50)
-    dataset = sf_processing()
+    bmhad_processing(data_dir= '/home/bgu9/Fall_Detection_KD_Multimodal/data/berkley_mhad/',mode = 'test', acc_window_size = 50, skl_window_size = 50)
+    #dataset = sf_processing()
