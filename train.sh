@@ -1,7 +1,8 @@
 #!/bin/bash
-weights="smartfallmm_skeleton.pt"
-work_dir="exps/smartfallmm/skeleton"
+weights="inertial_KD.pt"
+work_dir="exps/berkley_woKD/student_KD"
 result_file="result.txt"
+
 
 # weights="berkley_best.pt"
 # work_dir="exps/bmhad_woKD/late_fusion_epoch150_alldrop0.4"
@@ -15,8 +16,9 @@ result_file="result.txt"
 
 
 #berkley_student
-# python3 main.py --config ./config/berkley/teacher.yaml --work-dir "$work_dir" --model-saved-name "$weights" --device 3 --base-lr 2.5e-3 --include-val True
-# python3 main.py --config ./config/berkley/teacher.yaml --work-dir "$work_dir" --weights "$work_dir/$weights" --device 3  --base-lr 2.5e-3 --phase 'test'
+#python3 main.py --config ./config/berkley/student.yaml --work-dir "$work_dir" --weights "$work_dir/$weights" --model-saved-name "$weights" --device 3 --base-lr 2.5e-3 --phase test
+#python3 main.py --config ./config/berkley/student.yaml --work-dir "$work_dir" --model-saved-name "$weights" --weights "$work_dir/$weights" --device 3  --base-lr 2.5e-3 --include-val True
+#python3 distiller.py --config ./config/berkley/distill.yaml --work-dir $work_dir --model-saved-name $weights  --weights $work_dir/$weights --device 3 --base-lr 2.5e-3 --include-val True
 
 #utd student
 #python3 main.py --config ./config/czu/student.yaml --work-dir $work_dir --model-saved-name $weights  --weights $work_dir/$weights --device 3 --base-lr 2.5e-3 --include-val True
@@ -26,6 +28,7 @@ result_file="result.txt"
 #python3 distiller.py --config ./config/utd/distill.yaml --weights exps/UTD_wKD/MMNorm/test.pt --device 0 --base-lr 2.5e-3 --phase 'test'
 
 #czu 
+#python3 main.py --config ./config/czu/student.yaml --work-dir $work_dir --model-saved-name $weights  --weights $work_dir/$weights --device 3 --base-lr 2.5e-3 --include-val True
 #python3 distiller.py --config ./config/czu/distill.yaml --work-dir $work_dir --model-saved-name $weights  --weights $work_dir/$weights --device 3 --base-lr 2.5e-3 --include-val True
 
 #smartfallmm

@@ -187,7 +187,6 @@ class Distiller(Trainer):
         accuracy = 0
         cnt = 0
         train_loss = 0
-        print(type(loader))
         process = tqdm(loader, ncols = 80)
 
         for batch_idx, (inputs, targets, idx) in enumerate(process):

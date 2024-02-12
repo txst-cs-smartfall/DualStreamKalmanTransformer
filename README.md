@@ -2,13 +2,20 @@
 ## Getting started 
 - Create an conda environment and use the requirements.txt to install all the neccasary files.
 ```bash
-conda create --name test1
+python3.8 -m venv smfall
 ```
 ```bash
-conda activate test1
+source smfall/bin/activate
+```
+```bash
+cd Fall_Detection_KD_Multimodal
 ```
 ```bash
 pip install -r requirements.txt
+```
+
+```bash
+pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
 ```
 
 ## Get the Dataset
@@ -18,7 +25,9 @@ pip install -r requirements.txt
 - The datasets can processed from the scartch using the Processing_data.ipynb file.
 
 ## Choose and configure models
-- Model configuration for Accelerometer model is kept under ``config/utd/student.yaml`` and in ``config/utd/teacher.yaml`` for Multimodal model.
+- Model configuration for Accelerometer model is kept under ``config/utd/student.yaml`` and in ``config/utd/teacher.yaml`` for  UTD Multimodal model.
+
+- Model Configuration or Skeleton model is kept under ``config/smartfallmm/teacher.yaml`` for SmartFallMM dataset.
 
 ## Train and test
 Give execution access to ``train.sh`` with 

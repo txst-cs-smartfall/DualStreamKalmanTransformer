@@ -238,20 +238,30 @@ class Trainer():
                 val_data = np.load('data/berkley_mhad/bhmad_uniformdis_skl50_val.npz')
                 norm_val, _, _ = normalization(data = val_data , mode = 'transform')
                 self.distribution_viz(val_data['labels'], self.arg.work_dir, 'val')
+
+                test_data = np.load('data/berkley_mhad/bhmad_uniformdis_skl50_test.npz')
+                norm_test, _, _ =  normalization(data = test_data, mode = 'fit' )
+
+                self.data_loader['test'] = torch.utils.data.DataLoader(
+                    dataset=Feeder(**self.arg.test_feeder_args, dataset = norm_test),
+                    batch_size=self.arg.test_batch_size,
+                    shuffle=False,
+                    num_workers=self.arg.num_worker)
             
             elif self.arg.dataset == 'czu':
                 train_data = czu_processing(mode='train', acc_window_size = self.arg.model_args['acc_frames'],
                                             skl_window_size=self.arg.model_args['spatial_embed'],
                                             num_windows=15  )
                 
-                norm_train, acc_scaler, skl_scaler =  normalization(data=train_data, mode = 'fit')
+                #norm_train, acc_scaler, skl_scaler =  normalization(data=train_data, mode = 'fit')
 
                 val_data = czu_processing(mode='test', acc_window_size=self.arg.model_args['acc_frames'], 
                                           skl_window_size=self.arg.model_args['spatial_embed'], 
                                           num_windows=15)
-                norm_val, acc_scaler, skl_scaler =  normalization(data=val_data, mode = 'fit')
+                #norm_val, acc_scaler, skl_scaler =  normalization(data=val_data, mode = 'fit')
                 
-                norm_test = norm_val
+                #norm_test = norm_val
+                norm_test = val_data
 
                 self.data_loader['test'] = torch.utils.data.DataLoader(
                     dataset=Feeder(**self.arg.test_feeder_args, dataset = norm_test),
@@ -288,7 +298,10 @@ class Trainer():
             # self.acc_scaler = acc_scaler
             # self.skl_scaler = skl_scaler
             self.data_loader['train'] = torch.utils.data.DataLoader(
-                dataset=Feeder(**self.arg.train_feeder_args,dataset = norm_train, transform =None),
+                dataset=Feeder(**self.arg.train_feeder_args,
+                               dataset = norm_train, 
+                               #dataset = train_data,
+                               transform =None),
                 #dataset = norm_train,
                 batch_size=self.arg.batch_size,
                 shuffle=True,
@@ -296,7 +309,10 @@ class Trainer():
             
             
             self.data_loader['val'] = torch.utils.data.DataLoader(
-                dataset=Feeder(**self.arg.val_feeder_args, dataset = norm_val),
+                dataset=Feeder(**self.arg.val_feeder_args,
+                               dataset = norm_val
+                               #dataset = val_data
+                               ),
                 #dataset = norm_val,
                 batch_size=self.arg.batch_size,
                 shuffle=True,
@@ -457,7 +473,7 @@ class Trainer():
                     self.best_accuracy = accuracy
                     state_dict = self.model.state_dict()
                     #weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in state_dict.items()])
-                    torch.save(state_dict, self.arg.work_dir + '/' + self.arg.model_saved_name+ str(epoch)+ '.pt')
+                    torch.save(state_dict, self.arg.work_dir + '/' + self.arg.model_saved_name+ '.pt')
                     self.print_log('Weights Saved') 
         
         else: 
@@ -537,7 +553,7 @@ class Trainer():
                     self.best_accuracy = accuracy
                     state_dict = self.model.state_dict()
                     #weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in state_dict.items()])
-                    torch.save(state_dict, self.arg.work_dir + '/' + self.arg.model_saved_name)
+                    torch.save(state_dict, self.arg.weights)
                     self.print_log('Weights Saved')
         else: 
             return pred_list, label_list, wrong_idx
@@ -564,11 +580,11 @@ class Trainer():
             self.print_log(f'seed: {self.arg.seed}')
             self.loss_viz(self.train_loss_summary, self.val_loss_summary)
             
-            self.model = self.load_model(self.arg.model, self.arg.model_args)
-            self.load_loss()
-            self.load_optimizer()
-            self.model.load_state_dict(torch.load(self.arg.weights))
-            val_loss = self.eval(0, loader_name='test', result_file=self.arg.result_file)
+            # self.model = self.load_model(self.arg.model, self.arg.model_args)
+            # self.load_loss()
+            # self.load_optimizer()
+            # self.model.load_state_dict(torch.load(self.arg.weights))
+            # val_loss = self.eval(0, loader_name='test', result_file=self.arg.result_file)
 
         
         elif self.arg.phase == 'test' :
