@@ -105,7 +105,7 @@ def sf_processing(data_dir = 'data/smartfallmm', mode = 'train',
     print("file paths {}".format(len(file_paths)))
     #skl_path = f"{data_dir}/{mode}_skeleton_op/"
     #skl_path = f"{data_dir}/{mode}/skeleton/"
-    acc_dir = f"data_dir/{mode}/intertial/"
+    acc_dir = f"{data_dir}/{mode}/intertial/"
     pattern = r'S\d+A\d+T\d+'
     act_pattern = r'(A\d+)'
     label_pattern = r'(\d+)'
