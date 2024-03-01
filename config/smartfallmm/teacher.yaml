@@ -8,7 +8,6 @@ model: Models.model_skeleton_only.ActRecogTransformer
 dataset: 'smartfallmm'
 
 
-
 model_args:
   mocap_frames: 32
   num_joints: 32
