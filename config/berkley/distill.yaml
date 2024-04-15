@@ -1,7 +1,7 @@
 teacher_model: Models.ef_w_decoder.MMTransformer
 student_model: Models.model_acc_only.ActTransformerAcc
 dataset: bmhad
-teacher_weight: exps/berkley_woKD/teacher_woKD/berkley_teacherwoKD.pt
+#teacher_weight: exps/berkley_woKD/teacher_woKD/berkley_teacherwoKD.pt
 
 #model_args
 teacher_args:
