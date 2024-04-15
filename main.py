@@ -376,7 +376,7 @@ class Trainer():
     def cm_viz(self, y_pred : List[int], y_true : List[int]): 
         cm = confusion_matrix(y_true, y_pred)
         # plot the confusion matrix
-        plt.figure(figsize=(10,6))
+        plt.figure(figsize=(6,6))
         plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
         plt.colorbar()
         plt.xticks(np.unique(y_true))
@@ -599,6 +599,7 @@ class Trainer():
             if self.arg.weights is None: 
                 raise ValueError('Please add --weights')
             y_pred, y_true, wrong_idx = self.eval(epoch=0, loader_name='test', result_file=self.arg.result_file)
+            print(y_pred)
             self.cm_viz(y_pred, y_true)
             #self.wrong_pred_viz(wrong_idx=wrong_idx)
 
