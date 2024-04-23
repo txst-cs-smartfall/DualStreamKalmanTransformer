@@ -1,7 +1,7 @@
 #!/bin/bash
-teacher_weights="spTransformer.pth"
-teacher_dir="exps/utd_woKD/spatial_transformer"
-student_dir="exps/utd_KD/inertial_transformer"
+teacher_weights="agcn.pth"
+teacher_dir="exps/utd/agn"
+student_dir="exps/berkley_woKD/inertial_transformer"
 student_weights="ttfstudent.pth"
 #teacher_dir="exps/UTD_wKD/ttf4"
 result_file="result.txt"
@@ -26,7 +26,7 @@ result_file="result.txt"
 
 #distillation 
 #python3 distiller.py --config ./config/utd/distill.yaml --work-dir $student_dir --device 7  --teacher-weight "$teacher_dir/$teacher_weights" --model-saved-name "$student_weights" --device 7 --base-lr 2.5e-3 --include-val True
-python3 distiller.py --config ./config/utd/distill.yaml --work-dir "$student_dir" --weights "$student_dir/$student_weights" --device 7 --base-lr 2.5e-3 --phase 'test'
+#python3 distiller.py --config ./config/utd/distill.yaml --work-dir "$student_dir" --weights "$student_dir/$student_weights" --device 7 --base-lr 2.5e-3 --phase 'test'
 
 #berkley teacher 
 #python3 main.py --config ./config/berkley/teacher.yaml --work-dir "$teacher_dir" --model-saved-name "$teacher_weights" --device 7  --base-lr 2.5e-3 --phase 'train' --include-val True
@@ -46,3 +46,4 @@ python3 distiller.py --config ./config/utd/distill.yaml --work-dir "$student_dir
 
 #smartfallmm
 #python3 main.py --config ./config/smartfallmm/teacher.yaml --work-dir $work_dir --model-saved-name $weights  --weights $work_dir/$weights --device 6 --base-lr 2.5e-3 --include-val True
+python3 main.py --config ./config/utd/graph.yaml --work-dir "$teacher_dir" --model-saved-name "$teacher_weights" --device 7  --base-lr 2.5e-3 --phase 'train' --include-val True
