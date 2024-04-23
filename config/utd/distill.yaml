@@ -56,7 +56,7 @@ feeder: Feeder.Make_Dataset.UTD_mm
 
 distill_loss: loss.SemanticLoss
 distill_args: 
-  T : 2.5
+  T : 2.0
   alpha: 0.8
 
 student_loss: loss.BCE

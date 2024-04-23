@@ -8,6 +8,7 @@ import time
 
 #environmental import
 import numpy as np 
+import seaborn as sns
 from einops import rearrange
 import torch
 import torch.nn as nn
@@ -28,6 +29,36 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 from Feeder.augmentation import TSFilpper
 from utils.dataprocessing import utd_processing , bmhad_processing, czu_processing, sf_processing,normalization
 from utils.dataset_loader import load_inertial_data, load_skeleton_data
+
+ACTIONS = [
+    "swipe_left",
+    "swipe_right",
+    "wave",
+    "clap",
+    "throw",
+    "arm_cross",
+    "basketball_shoot",
+    "draw_x",
+    "draw_circle_(clockwise)",
+    "draw_circle_(counter_clockwise)",
+    "draw_triangle",
+    "bowling",
+    "boxing",
+    "baseball_swing",
+    "tennis_swing",
+    "arm_curl",
+    "tennis_serve",
+    "push",
+    "knock",
+    "catch",
+    "pickup_and_throw",
+    "jog",
+    "walk",
+    "sit_to_stand",
+    "stand_to_sit",
+    "lunge",
+    "squat"
+]
 
 def get_args():
 
@@ -159,11 +190,12 @@ class Trainer():
         return model 
     
     def load_loss(self):
-        criterion= import_class(self.arg.loss)
+        #criterion= import_class(self.arg.loss)
         #self.criterion = torch.nn.NLLLoss()
         #loss_args = yaml.safe_load(arg.loss_args)
-        self.criterion = criterion()
-    
+        #self.criterion = criterion()
+        self.loss = torch.nn.CrossEntropyLoss()
+
     def load_weights(self, weights):
         self.model.load_state_dict(torch.load(self.arg.weights))
     
@@ -205,30 +237,30 @@ class Trainer():
         self.data_loader = dict()
         if self.arg.phase == 'train':
             if self.arg.dataset == 'utd':
-                train_data =  utd_processing(mode = self.arg.phase, 
-                                             acc_window_size = self.arg.model_args['acc_frames'], 
-                                             #skl_window_size = self.arg.model_args['spatial_embed'], 
-                                             num_windows = 15)
+                # train_data =  utd_processing(mode = self.arg.phase, 
+                #                              acc_window_size = self.arg.model_args['acc_frames'], 
+                #                              #skl_window_size = self.arg.model_args['spatial_embed'], 
+                #                              num_windows = 15)
 
-                #self.distribution_viz(train_data['labels'], self.arg.work_dir, 'train')
-                norm_train, acc_scaler, skl_scaler =  normalization(data = train_data, mode = 'fit')
-                val_data =  utd_processing(mode = 'val', 
-                                             acc_window_size = self.arg.model_args['acc_frames'], 
-                                             #skl_window_size = self.arg.model_args['spatial_embed'], 
-                                             num_windows = 15)
-                norm_val, _, _ =  normalization(data = val_data,#acc_scaler=acc_scaler,
-                                               #skl_scaler=skl_scaler,
-                                                 mode = 'fit')
-                self.distribution_viz(val_data['labels'], self.arg.work_dir, 'val')
+                # #self.distribution_viz(train_data['labels'], self.arg.work_dir, 'train')
+                # norm_train, acc_scaler, skl_scaler =  normalization(data = train_data, mode = 'fit')
+                # val_data =  utd_processing(mode = 'val', 
+                #                              acc_window_size = self.arg.model_args['acc_frames'], 
+                #                              #skl_window_size = self.arg.model_args['spatial_embed'], 
+                #                              num_windows = 15)
+                # norm_val, _, _ =  normalization(data = val_data,#acc_scaler=acc_scaler,
+                #                                #skl_scaler=skl_scaler,
+                #                                  mode = 'fit')
+                # self.distribution_viz(val_data['labels'], self.arg.work_dir, 'val')
 
-                test_data =  utd_processing(mode = 'test', 
-                                            acc_window_size = self.arg.model_args['acc_frames'], 
-                                             #skl_window_size = self.arg.model_args['spatial_embed'], 
-                                             num_windows = 15)
-                norm_test, _, _ =  normalization(data = test_data, mode = 'fit' )
-                self.distribution_viz(test_data['labels'], self.arg.work_dir, 'test')
+                # test_data =  utd_processing(mode = 'test', 
+                #                             acc_window_size = self.arg.model_args['acc_frames'], 
+                #                              #skl_window_size = self.arg.model_args['spatial_embed'], 
+                #                              num_windows = 15)
+                # norm_test, _, _ =  normalization(data = test_data, mode = 'fit' )
+                # self.distribution_viz(test_data['labels'], self.arg.work_dir, 'test')
                 self.data_loader['test'] = torch.utils.data.DataLoader(
-                    dataset=Feeder(**self.arg.test_feeder_args, dataset = norm_test),
+                    dataset=Feeder(**self.arg.test_feeder_args),
                     batch_size=self.arg.test_batch_size,
                     shuffle=False,
                     num_workers=self.arg.num_worker)
@@ -248,7 +280,7 @@ class Trainer():
                 norm_test, _, _ =  normalization(data = test_data, mode = 'fit' )
 
                 self.data_loader['test'] = torch.utils.data.DataLoader(
-                    dataset=Feeder(**self.arg.test_feeder_args, dataset = norm_test),
+                    dataset=Feeder(**self.arg.test_feeder_args),
                     batch_size=self.arg.test_batch_size,
                     shuffle=False,
                     num_workers=self.arg.num_worker)
@@ -305,10 +337,9 @@ class Trainer():
             # self.acc_scaler = acc_scaler
             # self.skl_scaler = skl_scaler
             self.data_loader['train'] = torch.utils.data.DataLoader(
-                dataset=Feeder(**self.arg.train_feeder_args,
-                               dataset = norm_train, 
-                               #dataset = train_data,
-                               transform =None),
+                dataset=Feeder(**self.arg.train_feeder_args),
+                               #dataset = norm_train, 
+                               #dataset = train_data,),
                 #dataset = norm_train,
                 batch_size=self.arg.batch_size,
                 shuffle=True,
@@ -317,7 +348,7 @@ class Trainer():
             
             self.data_loader['val'] = torch.utils.data.DataLoader(
                 dataset=Feeder(**self.arg.val_feeder_args,
-                               dataset = norm_val
+                               #dataset = norm_val
                                #dataset = val_data
                                ),
                 #dataset = norm_val,
@@ -378,12 +409,13 @@ class Trainer():
         # plot the confusion matrix
         plt.figure(figsize=(6,6))
         plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+        #sns.heatmap(cm, annot=True, cmap='Blues', fmt='g')
         plt.colorbar()
-        plt.xticks(np.unique(y_true))
+        
+        plt.xticks(np.unique(y_true), rotation = 90)
         plt.yticks(np.unique(y_true))
-        plt.xlabel("Predicted label")
-        plt.ylabel("True label")
-        plt.title("Confusion Matrix")
+        plt.xlabel("Predicted Class")
+        plt.ylabel("True Class")
         plt.savefig(self.arg.work_dir + '/' + 'Confusion Matrix')
         plt.close()
     
@@ -427,9 +459,10 @@ class Trainer():
  
             # print(data)
             with torch.no_grad():
-                acc_data = inputs['acc_data'].cuda(self.output_device) #print("Input batch: ",inputs)
-                skl_data = inputs['skl_data'].cuda(self.output_device)
-                targets = targets.cuda(self.output_device)
+                # acc_data = inputs['acc_data'].cuda(self.output_device) #print("Input batch: ",inputs)
+                # skl_data = inputs['skl_data'].cuda(self.output_device)
+                inputs = inputs.float().cuda(self.output_device)
+                targets = targets.long().cuda(self.output_device)
                 # acc_data = acc_data.long().cuda(self.output_device)
                 # skl_data = rearrange(skl_data, 'b f (j c) -> b f j c', c = 3, j = 20)
                 # skl_data = skl_data.long().cuda(self.output_device)
@@ -441,7 +474,8 @@ class Trainer():
 
             # Ascent Step
             #print("labels: ",targets)
-            masks, logits,predictions = self.model(acc_data.float(), skl_data.float())
+            logits= self.model(inputs)
+            loss = self.loss(logits, targets) 
             #logits = self.model(acc_data.float(), skl_data.float())
             #print("predictions: ",torch.argmax(predictions, 1) )
             # bce_loss = self.criterion(logits, targets)
@@ -449,7 +483,7 @@ class Trainer():
             # for mask in masks: 
             #     slim_loss += sum([self.slim_penalty(m) for m in mask])
             # loss = bce_loss + (0.3*slim_loss)
-            loss = self.criterion(masks, logits, targets)
+            #loss = self.criterion(masks, logits, targets)
             loss.mean().backward()
             self.optimizer.step()
 
@@ -515,9 +549,12 @@ class Trainer():
         with torch.no_grad():
             for batch_idx, (inputs, targets, idx) in enumerate(process):
             # for batch_idx, [acc_data, skl_data, targets] in enumerate(process):
-                acc_data = inputs['acc_data'].cuda(self.output_device) #print("Input batch: ",inputs)
-                skl_data = inputs['skl_data'].cuda(self.output_device)
-                targets = targets.cuda(self.output_device)
+                # acc_data = inputs['acc_data'].cuda(self.output_device) #print("Input batch: ",inputs)
+                # skl_data = inputs['skl_data'].cuda(self.output_device)
+                # targets = targets.cuda(self.output_device)
+
+                inputs = inputs.float().cuda(self.output_device)
+                targets = targets.long().cuda(self.output_device)
                 # acc_data = acc_data.long().cuda(self.output_device)
                 # skl_data = rearrange(skl_data, 'b f (j c) -> b f j c', c = 3, j = 20)
                 # skl_data = skl_data.long().cuda(self.output_device)
@@ -525,16 +562,17 @@ class Trainer():
                             
                 
                 #_,logits,predictions = self.model(inputs.float())
-                masks,logits,predictions = self.model(acc_data.float(), skl_data.float())
+                logits= self.model(inputs)
+                loss = self.loss(logits, targets) 
                 #logits = self.model(acc_data.float(), skl_data.float())
                 # bce_loss = self.criterion(logits, targets)
                 # slim_loss = 0
                 # for mask in masks: 
                 #     slim_loss += sum([self.slim_penalty(m) for m in mask])
                 # batch_loss = bce_loss + (0.3*slim_loss)
-                batch_loss = self.criterion(masks, logits, targets)
+                #batch_loss = self.criterion(masks, logits, targets)
                 #batch_loss = self.criterion(logits, targets)
-                loss += batch_loss.sum().item()
+                loss += loss.sum().item()
                 # accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
                 # pred_list.extend(torch.argmax(predictions ,1).tolist())
                 accuracy += (torch.argmax(F.log_softmax(logits,dim =1), 1) == targets).sum().item()
@@ -561,7 +599,7 @@ class Trainer():
                     self.best_accuracy = accuracy
                     #state_dict = self.model.state_dict()
                     #weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in state_dict.items()])
-                    torch.save(self.model, f'{self.arg.work_dir}/{self.arg.model_saved_name}')
+                    #torch.save(self.model, f'{self.arg.work_dir}/{self.arg.model_saved_name}')
                     self.print_log('Weights Saved')
         else: 
             return pred_list, label_list, wrong_idx
