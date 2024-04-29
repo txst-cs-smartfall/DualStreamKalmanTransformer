@@ -9,13 +9,13 @@ dataset: 'smartfallmm'
 
 
 model_args:
-  mocap_frames: 128
+  mocap_frames: 280
   num_joints: 32
-  in_chans: 3 
-  spatial_embed: 32 
+  in_chans: 3
+  spatial_embed: 32
   num_classes: 8
-  sdepth: 4
-  tdepth: 4
+  sdepth: 12
+  tdepth: 12
   acc_frames : 32
   # num_joints : 20
   # num_classes : 27
