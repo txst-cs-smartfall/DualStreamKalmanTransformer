@@ -29,6 +29,9 @@ from Feeder.augmentation import TSFilpper
 from utils.dataprocessing import utd_processing , bmhad_processing, czu_processing, sf_processing,normalization
 from utils.dataset_loader import load_inertial_data, load_skeleton_data
 
+TRAIN_SUBJECT = [2, 4, 5, 6, 7, 10, 11]
+TEST_SUBJECT = [16, 17, 19, 21]
+
 def get_args():
 
     parser = argparse.ArgumentParser(description = 'Distillation')
@@ -276,14 +279,14 @@ class Trainer():
 
             elif self.arg.dataset == 'smartfallmm':
 
-                train_data = sf_processing(mode = 'train',
+                train_data = sf_processing(subjects= TRAIN_SUBJECT,
                                             acc_window_size= self.arg.model_args['acc_frames'],
                                             skl_window_size=self.arg.model_args['mocap_frames'], 
                                             num_windows = 10)
                 
                 norm_train, acc_scaler, skl_scaler =  normalization(data=train_data, mode = 'fit')
 
-                val_data = sf_processing(mode='test', 
+                val_data = sf_processing(subjects = TEST_SUBJECT, 
                                           acc_window_size=self.arg.model_args['acc_frames'],
                                           skl_window_size=self.arg.model_args['mocap_frames'], 
                                           num_windows=10)
