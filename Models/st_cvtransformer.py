@@ -304,12 +304,12 @@ class MMTransformer(nn.Module):
 
 
         # #Extract acc_signal from input 
-        # sx = acc_data
-        # sx = sx.view(b, self.num_patch, -1)
-        # sx = self.Acc_encoder(sx)
+        sx = acc_data
+        sx = sx.view(b, self.num_patch, -1)
+        sx = self.Acc_encoder(sx)
 
         # #Get acceleration features 
-        # sx, cv_signals = self.Acc_forward_features(sx)
+        sx, cv_signals = self.Acc_forward_features(sx)
         #Get skeletal features
         #x, cls_token = self.Spatial_forward_features(x) # in: B x mocap_frames x num_joints x in_chann  out: x = b x mocap_frame x (num_joints*Se) cls_token b x mocap_frames*Se     
         #Pass cls  token to temporal transformer
@@ -317,7 +317,7 @@ class MMTransformer(nn.Module):
         # temp_cls_token = self.proj_up_clstoken(cls_token) # in b x mocap_frames * se -> #out: b x num_joints*Se
         # temp_cls_token = torch.unsqueeze(temp_cls_token, dim = 1) #in: B x 1 x num_joints*Se)
         x = self.Temp_forward_features(x) #in: B x mocap_frames x ()
-        # x = x + sx 
+        x = x + sx 
         logits = self.class_head(x)
         return x , logits, F.log_softmax(logits,dim =1)
 
