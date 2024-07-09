@@ -180,7 +180,7 @@ class MMTransformer(nn.Module):
                                           nn.ReLU() )
         
         self.transform = nn.Sequential(
-                            nn.Linear(17, 32),
+                            nn.Linear(18, 32),
                             nn.ReLU())
 
     # def Acc_forward_features(self, x):
@@ -302,7 +302,7 @@ class MMTransformer(nn.Module):
         # acc_data = rearrange(acc_data, 'b f c -> b c f')
         # acc_data = F.avg_pool1d(acc_data,(acc_data.shape[-1]//4)-1,stride=1,padding = 3, count_include_pad =True)
         # acc_data = rearrange(acc_data, 'b c f -> b f c')
-        acc_data = acc_data.unsqueeze(2)
+        acc_data = torch.reshape(acc_data, [b,f,2,3])
         combined_data = torch.cat((skl_data, acc_data), dim = 2) #[8, 128 , 3] [8, 128, 32, 3]
 
         #Spatial Block  

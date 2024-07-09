@@ -4,6 +4,8 @@ from typing import Dict, Tuple
 from torch.nn import Linear, LayerNorm, TransformerEncoder, TransformerEncoderLayer, ModuleList
 import torch.nn.functional as F
 from einops import rearrange
+import itertools
+import numpy as np
 #from util.graph import Graph
 import math
 
@@ -42,6 +44,51 @@ class PeriodicLayer(nn.Module):
         output = torch.sin(output)  # You can also use torch.cos() or other periodic functions
         return output
 
+def add_av(data,av):
+    av_data = np.concatenate((data, av), axis = 1)
+    return av_data
+def cal_combination(numbers):
+    combinations = list(itertools.combinations(numbers,2))
+    return combinations
+
+def calculate_angle(a, b):
+    # Calculate dot product
+    dot_product = np.matmul(a, b)
+    
+    # Calculate magnitudes
+    magnitude_a = np.linalg.norm(a)
+    magnitude_b = np.linalg.norm(b)
+    
+    # Calculate cosine of the angle
+    cos_theta = dot_product / (magnitude_a * magnitude_b)
+    
+    # Handle numerical errors that might lead to cos_theta being slightly outside the range [-1, 1]
+    cos_theta = np.clip(cos_theta, -1, 1)
+    
+    # Calculate the angle in radians
+    theta_radians = np.arccos(cos_theta)
+    
+    # Convert the angle to degrees
+    theta_degrees = np.degrees(theta_radians)
+    
+    return theta_degrees
+
+def cal_av(data):
+    #calculating combinations
+    # streams = data.shape[1] // 3
+    # combinations = cal_combination(streams-1)
+
+    angle = calculate_angle(data[:,:, 0:3], data[:, :,3:6])
+    mod_data = add_av(data, angle)
+    return mod_data
+    # vectors = np.zeros(data.shape[0], (streams-1)*3)
+
+     
+    # for i, combination in enumerate(combinations): 
+    #     diff = data[:, combination[0]*3] - data[:, combination[1]*3]
+    #     vectors[i:i+3] = diff
+
+
 class TransModel(nn.Module):
     def __init__(self, data_shape:Dict[str, Tuple[int, int]] = {'inertial':(128, 3)},
                 mocap_frames = 128,
@@ -49,13 +96,20 @@ class TransModel(nn.Module):
                 acc_frames = 128,
                 num_classes:int = 8, 
                 num_heads = 4, 
+                acc_coords = 3, 
+                av = False,
                 adepth = 2, norm_first = True, 
                 acc_embed= 256, activation = 'relu',
                 **kwargs) :
         super().__init__()
-        self.data_shape = (acc_frames, 3)
+        self.data_shape = (acc_frames, acc_coords)
         self.length = self.data_shape[0]
         size = self.data_shape[1]
+        self.av = av
+        if av : 
+            size = size + 3
+        
+        print(size)
 
         self.input_proj = nn.Sequential(nn.Conv1d(self.length, acc_embed, 1), nn.GELU(),
                                         nn.Conv1d(acc_embed, acc_embed, 1), nn.GELU(),
@@ -70,7 +124,7 @@ class TransModel(nn.Module):
 
         self.reduciton =  ModuleList([Linear(acc_embed, int(acc_embed/2)),
                                    Linear(int(acc_embed/2), acc_embed//4)])
-        self.feature_transform = nn.Linear(3, 16)
+        self.feature_transform = nn.Linear(size, 16)
         pooled = acc_embed//8 + 1 
         self.ln1 = nn.Linear(pooled*16, 64)
         self.output = Linear(64, num_classes)
@@ -136,3 +190,5 @@ class TransModel(nn.Module):
         # output = self.fc(lstm_out[:, -1, :])
         # output = self.sigmoid(output)
         return x
+    
+
