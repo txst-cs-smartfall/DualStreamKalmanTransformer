@@ -16,8 +16,45 @@ from sklearn.preprocessing import StandardScaler
 from einops import rearrange
 # TRAIN_SUBJECT = [2, 4, 5, 7,8, 10, 11,14, 15, 16, 17,19, 21, 23, 26]
 # TEST_SUBJECT = [6]
-TRAIN_SUBJECT = [ i for i in range(30, 37)]
-TEST_SUBJECT = [37]
+
+
+def add_av(data,av):
+    av_data = np.concatenate((data, av), axis = 1)
+    return av_data
+def cal_combination(numbers):
+    combinations = list(itertools.combinations(numbers,2))
+    return combinations
+
+def calculate_angle(a, b):
+    # Calculate dot product
+    dot_product = a * b
+    
+    # Calculate magnitudes
+    magnitude_a = np.linalg.norm(a)
+    magnitude_b = np.linalg.norm(b)
+    
+    # Calculate cosine of the angle
+    cos_theta = dot_product / (magnitude_a * magnitude_b)
+    
+    # Handle numerical errors that might lead to cos_theta being slightly outside the range [-1, 1]
+    cos_theta = np.clip(cos_theta, -1, 1)
+    
+    # Calculate the angle in radians
+    theta_radians = np.arccos(cos_theta)
+    
+    # Convert the angle to degrees
+    # theta_degrees = np.degrees(theta_radians)
+    # print(theta_degrees)
+    return theta_radians
+
+def cal_av(data):
+    #calculating combinations
+    # streams = data.shape[1] // 3
+    # combinations = cal_combination(streams-1)
+
+    angle = calculate_angle(data[:,:, 0:3], data[:, :,3:6])
+    mod_data = add_av(data, angle)
+    return mod_data
 
 def avg_pool(sequence, window_size = 5, stride=1, max_length = 512 , shape = None):
     shape = sequence.shape
@@ -118,6 +155,8 @@ def bmhad_processing(data_dir = 'data/berkley_mhad', mode = 'train', acc_window_
 
     return dataset
 
+
+
 def sf_processing(data_dir = 'data/smartfallmm', subjects = None,
                     skl_window_size = 32, 
                     num_windows = 10,
@@ -127,11 +166,12 @@ def sf_processing(data_dir = 'data/smartfallmm', subjects = None,
     acc_set = []
     label_set = []
 
-    file_paths = glob.glob(f'{data_dir}/old_participants/skeleton/*.csv')
+    file_paths = glob.glob(f'{data_dir}/student_participants/skeleton/*.csv')
     print("file paths {}".format(len(file_paths)))
     #skl_path = f"{data_dir}/{mode}_skeleton_op/"
     #skl_path = f"{data_dir}/{mode}/skeleton/"
-    acc_dir = f"{data_dir}/old_participants/accelerometer/phone_accelerometer"
+    acc_dir = f"{data_dir}/student_participants/accelerometer/watch_accelerometer"
+    phone_dir = f"{data_dir}/student_participants/accelerometer/phone_accelerometer"
     pattern = r'S\d+A\d+T\d+'
     act_pattern = r'(A\d+)'
     label_pattern = r'(\d+)'
@@ -141,15 +181,23 @@ def sf_processing(data_dir = 'data/smartfallmm', subjects = None,
         if not int(desp[1:3]) in subjects:
             continue
         act_label = re.findall(act_pattern, path)[0]
-        label = int(int(re.findall(label_pattern, act_label)[0])-1)
-
+        label = int(int(re.findall(label_pattern, act_label)[0])>9)
         acc_path = f'{acc_dir}/{desp}.csv'
+
+        phone_path = f'{phone_dir}/{desp}.csv'
+
         if os.path.exists(acc_path):
              acc_df = pd.read_csv(acc_path, header = 0).dropna()
         else: 
              continue
+        
+        if os.path.exists(phone_path):
+             phone_df = pd.read_csv(phone_path, header = 0).dropna()
+        else: 
+             continue
 
         acc_data = acc_df.bfill().iloc[2:, -3:].to_numpy(dtype=np.float32)
+        phone_data = phone_df.bfill().iloc[2:, -3:].to_numpy(dtype=np.float32)
         
         skl_df  = pd.read_csv(path, index_col =False).dropna()
         skl_data = skl_df.bfill().iloc[:, -96:].to_numpy(dtype=np.float32)
@@ -157,13 +205,18 @@ def sf_processing(data_dir = 'data/smartfallmm', subjects = None,
         if  acc_data.shape[0] == 0:   
             os.remove(acc_path)
             continue
+        if phone_data.shape[0] < 10 : 
+            os.remove(phone_path)
+            continue
         padded_acc = pad_sequence_numpy(sequence=acc_data, input_shape= acc_data.shape, max_sequence_length=acc_window_size)
-
+        padded_phone = pad_sequence_numpy(sequence=phone_data, input_shape=phone_data.shape, max_sequence_length=acc_window_size)
+        av = calculate_angle(padded_acc, padded_phone)
         padded_skl = pad_sequence_numpy(sequence=skl_data, input_shape=skl_data.shape, max_sequence_length=skl_window_size)
 
+        combined_acc = np.concatenate((padded_acc,padded_phone), axis=1)
         
         skl_data = rearrange(padded_skl, 't (j c) -> t j c' , j = 32, c = 3)
-        acc_set.append(padded_acc)
+        acc_set.append(combined_acc)
         skl_set.append(skl_data)
         label_set.append(label)
         #skl_data = rearrange(skl_df.values[:, -96:], 't (j c) -> t j c' , j = 32, c = 3)
@@ -175,7 +228,6 @@ def sf_processing(data_dir = 'data/smartfallmm', subjects = None,
     #     skl_set.append(processed_skl[:sync_size, :, : , :])
     #     acc_set.append(processed_acc[:sync_size, : , :])
     #     label_set.append(np.repeat(label, processed_acc.shape[0]))
-
     concat_acc = np.stack(acc_set, axis = 0)
     concat_skl = np.stack(skl_set, axis = 0)
     # #s,w,j,c = concat_skl.shape

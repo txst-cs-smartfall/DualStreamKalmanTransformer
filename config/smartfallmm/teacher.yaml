@@ -6,23 +6,23 @@ model: Models.st_cvtransformer.MMTransformer
 # model_saved_name : tokenfusion_AdamW_avgpool
 # work_dir: exps/UTD_woKD/with_AdamW
 dataset: 'smartfallmm'
-subjects: [5,7,10,11,15,16,17,18,19,21,22,23]
+#subjects: [5,7,10,11,15,16,17,18,19,21,22,23]
 
-#subjects: [29, 31, 32, 34, 35, 36, 37]
+subjects: [29, 31, 32, 34, 35, 36, 37]
 #test_subjects: [29]
 
 model_args:
   # Keep as 2^n
   acc_frames : 128
   num_joints : 32
-  num_classes : 8
+  num_classes : 2
   spatial_embed : 64
   adepth : 2
   sdepth : 2
   num_heads : 2
   mocap_frames: 128
   num_patch: 4
-  acc_coords: 3
+  acc_coords: 6
   drop_path_rate: 0.5
   drop_rate: 0.5
   attn_drop_rate: 0.5
@@ -43,7 +43,7 @@ weight_decay: 0.0004
 batch_size: 8 # Change all 6 batch sizes consistently, Default: 16
 test_batch_size: 8
 val_batch_size : 8
-num_epoch: 120 # Change, Default: 250
+num_epoch: 2 # Change, Default: 250
 
 #dataloader
 feeder: Feeder.Make_Dataset.UTD_mm
