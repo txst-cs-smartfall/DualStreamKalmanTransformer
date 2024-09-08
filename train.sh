@@ -1,9 +1,9 @@
 #!/bin/bash
 teacher_weights="spTransformer"
-student_dir="exps/utd/student/wo_temporalblock"
+student_dir="exps/smartfall_har/student/right_implementation_test"
 work_dir="exps/smartfall_har/kd/loso"
 student_weights="ttfstudent"
-teacher_dir="exps/smartfall_har/skeleton+watch/test"
+teacher_dir="exps/smartfall_har/teacher/threesub_test"
 result_file="result.txt"
 
 
@@ -11,7 +11,7 @@ result_file="result.txt"
 # work_dir="exps/bmhad_woKD/late_fusion_epoch150_alldrop0.4"
 
 # #Utd student without KD
-python3 main.py --config ./config/utd/student.yaml --model-saved-name $student_weights --work-dir $student_dir --device 7 --base-lr 2.5e-3 --include-val True
+#python3 main.py --config ./config/utd/student.yaml --model-saved-name $student_weights --work-dir $student_dir --device 7 --base-lr 2.5e-3 --include-val True
 #python3 main.py --config ./config/utd/student.yaml --work-dir $work_dir  --weights "$work_dir/$student_weights" --device 7 --base-lr 2.5e-3 --phase 'test'
 
 
@@ -43,7 +43,7 @@ python3 main.py --config ./config/utd/student.yaml --model-saved-name $student_w
 #python3 main.py --config ./config/smartfallmm/teacher.yaml --work-dir $teacher_dir --model-saved-name $teacher_weights  --device 1 --base-lr 2.5e-3 --include-val True
 
 #accelerometer only experiment
-#python main.py --config ./config/smartfallmm/student.yaml --work-dir $student_dir --model-saved-name $student_weights --device 1 --base-lr 2.5e-3 --include-val True
+python main.py --config ./config/smartfallmm/student.yaml --work-dir $student_dir --model-saved-name $student_weights --device 1 --base-lr 2.5e-3 --include-val True
 #python main.py --config ./config/smartfallmm/teacher.yaml --work-dir $work_dir --weights $work_dir/$student_weights --device 1 --base-lr 2.5e-3 --phase test
 
 #distillation 

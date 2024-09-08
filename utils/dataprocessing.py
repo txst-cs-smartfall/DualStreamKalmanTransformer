@@ -14,10 +14,9 @@ import torch.nn.functional as F
 from bvh import Bvh
 from sklearn.preprocessing import StandardScaler
 from einops import rearrange
-# TRAIN_SUBJECT = [2, 4, 5, 7,8, 10, 11,14, 15, 16, 17,19, 21, 23, 26]
+TRAIN_SUBJECT = [2, 4, 5, 6, 7, 10, 11, 15, 16, 17,18,19, 21,23, 26]
 # TEST_SUBJECT = [6]
-TRAIN_SUBJECT = [ i for i in range(30, 37)]
-TEST_SUBJECT = [37]
+
 
 def avg_pool(sequence, window_size = 5, stride=1, max_length = 512 , shape = None):
     shape = sequence.shape
@@ -118,7 +117,7 @@ def bmhad_processing(data_dir = 'data/berkley_mhad', mode = 'train', acc_window_
 
     return dataset
 
-def sf_processing(data_dir = 'data/smartfallmm', subjects = None,
+def sf_processing(data_dir = '/home/bgu9/Fall_Detection_KD_Multimodal/data/smartfallmm', subjects = None,
                     skl_window_size = 32, 
                     num_windows = 10,
                     acc_window_size = 32,
@@ -126,12 +125,9 @@ def sf_processing(data_dir = 'data/smartfallmm', subjects = None,
     skl_set = []
     acc_set = []
     label_set = []
-
-    file_paths = glob.glob(f'{data_dir}/old_participant/skeleton/*.csv')
+    file_paths = glob.glob(f'{data_dir}/old_participants/Skeleton/*.csv')
     print("file paths {}".format(len(file_paths)))
-    #skl_path = f"{data_dir}/{mode}_skeleton_op/"
-    #skl_path = f"{data_dir}/{mode}/skeleton/"
-    acc_dir = f"{data_dir}/old_participant/phonewatch/w_accel"
+    acc_dir = f"{data_dir}/old_participants/accelerometer/Meta_wrist_Accelerometer"
     pattern = r'S\d+A\d+T\d+'
     act_pattern = r'(A\d+)'
     label_pattern = r'(\d+)'
@@ -182,6 +178,7 @@ def sf_processing(data_dir = 'data/smartfallmm', subjects = None,
     # print(concat_acc.shape)
     # print(concat_skl.shape)
     # #np.savez('/home/bgu9/KD_Multimodal/train.npz' , data = concat_acc, labels = concat_label)
+    print(concat_acc.shape)
     dataset = { 'acc_data' : concat_acc,
                  'skl_data' : concat_skl, 
                  'labels': concat_label}
