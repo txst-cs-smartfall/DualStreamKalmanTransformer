@@ -595,11 +595,13 @@ class Trainer():
                 self.best_f1 = float('inf')
                 self.print_log('Parameters: \n{}\n'.format(str(vars(self.arg))))
             
-            # results = self.create_df()
-            # for test_subject in self.arg.subjects : 
-                # train_subjects = list(filter(lambda x : x != test_subject, self.arg.subjects))
-                # self.test_subject = [test_subject]
-                # self.train_subjects = train_subjects
+                results = self.create_df()
+                #for i in range(len(self.arg.subjects)-1): 
+                    #train_subjects = list(filter(lambda x : x not in test_subject, self.arg.subjects))
+                test_subject = self.arg.subjects[-3:]
+                train_subjects = [x for x in self.arg.subjects if  x not in test_subject]
+                self.test_subject = test_subject
+                self.train_subjects = train_subjects
                 self.model = self.load_model(self.arg.model, self.arg.model_args)
                 self.print_log(f'Model Parameters: {self.count_parameters(self.model)}')
                 self.load_data()
@@ -608,8 +610,8 @@ class Trainer():
                 self.global_step = self.arg.start_epoch * len(self.data_loader['train']) / self.arg.batch_size
                 for epoch in range(self.arg.start_epoch, self.arg.num_epoch):
                     self.train(epoch)
-                # self.print_log(f'Train Subjects : {self.train_subjects}')
-                # self.print_log(f' ------------ Test Subject {self.test_subject[0]} -------')
+                self.print_log(f'Train Subjects : {self.train_subjects}')
+                self.print_log(f' ------------ Test Subject {self.test_subject} -------')
                 self.print_log(f'Best accuracy for : {self.best_accuracy}')
                 self.print_log(f'Best F-Score: {self.best_f1}')
                 #self.print_log(f'Epoch number: {self.best_acc_epoch}')
@@ -620,18 +622,18 @@ class Trainer():
                 self.print_log(f'Batch Size: {self.arg.batch_size}')
                 self.print_log(f'seed: {self.arg.seed}')
                 self.loss_viz(self.train_loss_summary, self.val_loss_summary)
-                # subject_result = pd.Series({'test_subject' : str(self.test_subject), 'train_subjects' :str(self.train_subjects), 
-                #                                'accuracy':round(self.best_accuracy,2), 'f1_score':round(self.best_f1, 2)})
-                # results.loc[len(results)] = subject_result
+                subject_result = pd.Series({'test_subject' : str(self.test_subject), 'train_subjects' :str(self.train_subjects), 
+                                            'accuracy':round(self.best_accuracy,2), 'f1_score':round(self.best_f1, 2)})
+                results.loc[len(results)] = subject_result
                 self.best_accuracy = 0
                 self.best_f1 = 0
-            # results.to_csv(f'{self.arg.work_dir}/scores.csv')
-                
-            # self.model = self.load_model(self.arg.model, self.arg.model_args)
-            # self.load_loss()
-            # self.load_optimizer()
-            # self.model.load_state_dict(torch.load(self.arg.weights))
-            # val_loss = self.eval(0, loader_name='test', result_file=self.arg.result_file)
+                results.to_csv(f'{self.arg.work_dir}/scores.csv')
+                    
+                # self.model = self.load_model(self.arg.model, self.arg.model_args)
+                # self.load_loss()
+                # self.load_optimizer()
+                # self.model.load_state_dict(torch.load(self.arg.weights))
+                # val_loss = self.eval(0, loader_name='test', result_file=self.arg.result_file)
 
         
         elif self.arg.phase == 'test' :

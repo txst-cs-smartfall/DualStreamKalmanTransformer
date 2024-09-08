@@ -141,21 +141,11 @@ class MMTransformer(nn.Module):
         # ])
 
 
-        # self.Acc_encoder = nn.Sequential(
-        #         nn.Linear(self.acc_patch_size * self.acc_coords, acc_embed),
-        #         nn.ReLU(),
-        #         # nn.Linear(32, 16),
-        #         # nn.ReLU(),
-        #         # nn.Linear(64, 128),
-        #         # nn.ReLU()
-        # )
-        #norm layer 
+
         self.Spatial_norm = norm_layer(spatial_embed)
         self.Acc_norm = norm_layer(acc_embed)
         self.Temporal_norm = norm_layer(temp_embed)
-        #self.intermediate_norm = nn.BatchNorm1d(9)
 
-        #positional dropout 
         self.pos_drop = nn.Dropout(p = drop_rate)
 
 
@@ -164,13 +154,6 @@ class MMTransformer(nn.Module):
             nn.Linear(temp_embed, num_classes)
         )
         
-        # self.spatial_frame_reduce = nn.Conv1d(self.mocap_frames, self.acc_frames, 1,1)
-        # self.frame_reduce_mf = nn.Conv1d(self.mocap_frames, self.acc_frames, 1,1)
-        # self.frame_reduce_acc = nn.Conv1d(self.acc_frames+1, self.mocap_frames+1, 1, 1)
-
-        # self.acc_conv = nn.Sequential(nn.Conv2d(acc_coords, acc_coords, (1, acc_coords), 1), 
-        #                                 nn.BatchNorm2d(acc_coords),
-        #                                 nn.ReLU())
 
         self.spatial_conv = nn.Sequential(nn.Conv2d(in_chans, in_chans, (1, 9), 1 ),
                                           nn.BatchNorm2d(in_chans),
@@ -183,77 +166,6 @@ class MMTransformer(nn.Module):
                             nn.Linear(17, 32),
                             nn.ReLU())
 
-    # def Acc_forward_features(self, x):
-    #     b,f,e = x.shape
-
-    #     #x = rearrange(x, 'b f p c -> b f (p c)') # 16 , 150, 1, 3
-        
-    #     # if self.embed_type == 'conv':
-    #     #     x = rearrange(x, '(b f) p c  -> (b f) c p',b=b ) # b x 3 x Fa  - Conv k liye channels first
-    #     #     x = self.Acc_coords_to_embedding(x) # B x c x p ->  B x Sa x p
-    #     #     x = rearrange(x, '(b f) Sa p  -> (b f) p Sa', b=b)
-    #     # else: 
-    #     #     x = self.Acc_coords_to_embedding(x)
-
-    #     class_token = torch.tile(self.acc_token, (b,1,1))
-    #     x = torch.cat((x, class_token), dim = 1)
-    #     _,_,Sa = x.shape
-
-    #     x += self.Acc_pos_embed
-    #     x = self.pos_drop(x)
-    #     ##get cross fusion indexe s
-    #     cv_signals = []
-    #     for _, blk in enumerate(self.Accelerometer_blocks):
-    #         cv_sig, x = blk(x)
-    #         cv_signals.append(x)
-        
-    #     x = self.Acc_norm(x)
-    #     cls_token = x[:,-1,:]    
-
-    #     if self.op_type == 'cls':
-    #         return cls_token , cv_signals
-
-    #     else:
-    #         x = x[:,:f,:]
-    #         x = rearrange(x, 'b f Sa -> b Sa f')
-    #         x = F.avg_pool1d(x,x.shape[-1],stride=x.shape[-1]) #b x Sa x 1
-    #         x = torch.reshape(x, (b,Sa))
-    #         return x,cv_signals #b x Sa
-    
-    # def Spatial_forward_features(self, x):
-
-    #     b, f, p , c = x.shape 
-    #     x = rearrange(x, 'b f p c -> (b f) p c') # B  = b x f
-
-
-    #     if self.embed_type == 'conv':
-    #         x = rearrange(x, '(b f) p c  -> (b f) c p',b=b ) # b x 3 x Fa  - Conv k liye channels first
-    #         x = self.Spatial_patch_to_embedding(x) # B x c x p ->  B x Se x p
-    #         x = rearrange(x, '(b f) Se p  -> (b f) p Se', b=b)
-    #     else: 
-    #         x = self.Spatial_patch_to_embedding(x) # B x p x c ->  B x p x Se
-        
-    #     class_token = torch.tile(self.spatial_token, (b*f, 1 , 1))
-    #     x = torch.cat((x, class_token), dim = 1)
-
-    #     x += self.Spatial_pos_embed 
-    #     x = self.pos_drop(x)
-
-    #     # for blk in self.Spatial_blocks:
-    #     #     x = blk(x)
-        
-    #     # x = self.Spatial_norm(x)
-
-    #     #extract class token 
-    #     Se = x.shape[-1]
-    #     cls_token = x[:,-1, :]
-    #     cls_token = torch.reshape(cls_token, (b, f*Se))
-
-    #     #reshape input 
-    #     x = x[:, :p, :]
-    #     x = rearrange(x, '(b f) p Se -> b f (p Se)', f = f)
-        
-    #     return x, cls_token
     
     def Temp_forward_features(self, x):
 
@@ -263,19 +175,9 @@ class MMTransformer(nn.Module):
         x = torch.cat((x, class_token), dim = 1)
         x += self.Temporal_pos_embed
         for idx, blk in enumerate(self.Temporal_blocks):
-            # print(f' In temporal {x.shape}')
-            # skl_data = self.frame_reduce(x)
-            # print(idx)
-            #acc_data = cv_signals[idx]
-            # if x.shape[1] > cv_signals[1].shape[1]-1:
-            #     x = self.frame_reduce_mf(x)
-            # elif x.shape[1] < cv_signals[1].shape[1] -1:
-            # else: 
-            #     x = x
-           
             x = blk(x) #output 3
             #x= x + acc_data #merged both 3
-            #x = self.intermediate_norm(x)
+            # x = self.intermediate_norm(x)
         x = self.Temporal_norm(x)
 
         ###Extract Class token head from the outputs
@@ -297,11 +199,7 @@ class MMTransformer(nn.Module):
         b, f, j, c = skl_data.shape
         j = j + 1
 
-        #Extract skeletal signal from input 
-        #x = inputs[:,:, :self.num_joints , :self.joint_coords]
-        # acc_data = rearrange(acc_data, 'b f c -> b c f')
-        # acc_data = F.avg_pool1d(acc_data,(acc_data.shape[-1]//4)-1,stride=1,padding = 3, count_include_pad =True)
-        # acc_data = rearrange(acc_data, 'b c f -> b f c')
+   
         acc_data = acc_data.unsqueeze(2)
         combined_data = torch.cat((skl_data, acc_data), dim = 2) #[8, 128 , 3] [8, 128, 32, 3]
 

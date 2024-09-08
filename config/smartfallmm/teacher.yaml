@@ -7,7 +7,7 @@ model: Models.st_cvtransformer.MMTransformer
 # work_dir: exps/UTD_woKD/with_AdamW
 dataset: 'smartfallmm'
 subjects: [5,7,10,11,15,16,17,18,19,21,22,23]
-
+#, 10, 11, 15, 16, 17,18,19, 21,23, 26
 #subjects: [29, 31, 32, 34, 35, 36, 37]
 #test_subjects: [29]
 
@@ -23,9 +23,9 @@ model_args:
   mocap_frames: 128
   num_patch: 4
   acc_coords: 3
-  drop_path_rate: 0.5
-  drop_rate: 0.5
-  attn_drop_rate: 0.5
+  drop_path_rate: 0.2
+  drop_rate: 0.2
+  attn_drop_rate: 0.2
 
 
 # loss_args 
@@ -50,15 +50,15 @@ feeder: Feeder.Make_Dataset.UTD_mm
 
 train_feeder_args:
   # npz_file: data/UTD_MAAD/utd_train_op_mf50_norm.npz
-  batch_size: 8
+  batch_size: 16
 
 val_feeder_args:
   # npz_file: data/UTD_MAAD/utd_val_op_mf50_norm.npz
-  batch_size: 8
+  batch_size: 16
 
 test_feeder_args: 
   # npz_file: data/UTD_MAAD/utd_test_op_mf50_norm.npz
-  batch_size: 8
+  batch_size: 16
 
 seed: 2 
 optimizer: sgd

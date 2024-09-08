@@ -24,6 +24,7 @@ from Feeder.augmentation import TSFilpper
 from utils.dataprocessing import utd_processing , bmhad_processing,normalization
 from main import Trainer, str2bool, init_seed, import_class
 from sklearn.metrics import f1_score
+from 
 
 
 
@@ -176,6 +177,7 @@ class Distiller(Trainer):
     def load_loss(self):
         self.mse = torch.nn.MSELoss()
         self.criterion = torch.nn.CrossEntropyLoss()
+        self.distillation_loss = 
     
 
     # def load_model(self, name, model, model_args):
@@ -218,14 +220,6 @@ class Distiller(Trainer):
             with torch.no_grad():
                 teacher_logits= self.model['teacher'](acc_data.float(), skl_data.float())
             student_logits= self.model['student'](acc_data.float(), skl_data.float())
-            #logits = self.model(acc_data.float(), skl_data.float())
-            #print("predictions: ",torch.argmax(predictions, 1) )
-            # bce_loss = self.criterion(logits, targets)
-            # slim_loss = 0
-            # for mask in masks: 
-            #     slim_loss += sum([self.slim_penalty(m) for m in mask])
-            # loss = bce_loss + (0.3*slim_loss)
-            #loss = self.criterion['distill'](student_logits, teacher_logits,targets)
             soft_target = nn.functional.softmax(teacher_logits / 2.0, dim = -1)
             soft_prob = nn.functional.log_softmax(student_logits / 2.0, dim = -1)
 

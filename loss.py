@@ -16,16 +16,14 @@ class SemanticLoss(nn.Module):
     def distillation_loss(self,logits, teacher_logits, labels):
        
         #Softmax of student prediciton
-        pred_hard = F.softmax(logits, dim = 1)
         pred_soft = F.log_softmax(logits/self.T, dim = 1)
 
         #Softmax of teacher prediction
         teacher_soft = F.log_softmax(teacher_logits/self.T, dim = 1)
 
         #KLDivergence of this two
-        kl_div = self.kd_loss(pred_soft, teacher_soft) *  ( self.T * self.T )
-        # #cross entropy loss 
-        # loss_y_label = F.cross_entropy(pred, labels) * (1.0 - alpha)
+        kl_div = F.kl_div(pred_soft, teacher_soft, reduction= 'batchmean') *  ( self.T * self.T )
+
 
         #focal loss
         loss_y_label = self.cross_entropy(logits, labels) 
@@ -76,17 +74,8 @@ class SemanticLoss(nn.Module):
         return loss
 
     def forward(self,stud_logits, teacher_logits, labels):
-        gamma = 0.1
-        beta = 0.1
-        sigma = 1 - gamma - beta
         kd_loss = self.distillation_loss(logits = stud_logits, labels = labels, teacher_logits = teacher_logits)
-        y = F.log_softmax(stud_logits, dim = 1)
-        teacher_y = F.log_softmax(teacher_logits, dim = 1)
-        angular_loss = self.angular_dist(y, teacher_y)
-        dist_loss = self.distance(y, teacher_y)
-
-        loss = (sigma*kd_loss) + (beta*angular_loss) + (gamma*dist_loss)
-        return loss
+        return kd_loss
     
 class FocalLoss(nn.Module):
     def __init__(self, alpha=0.25, gamma=2):
