@@ -5,6 +5,7 @@ import random
 import sys
 import os
 import time
+import shutil
 
 #environmental import
 import numpy as np 
@@ -135,7 +136,8 @@ class Trainer():
         self.arg = arg
         # self.save_arg()
         if not os.path.exists(self.arg.work_dir):
-            os.makedirs(self.arg.work_dir)
+            os.makedirs(self.arg.work_dir)                     
+            self.save_config(arg.config, arg.work_dir)
         if self.arg.phase == 'train':
             self.model = self.load_model(arg.model, arg.model_args)
         else: 
@@ -154,6 +156,10 @@ class Trainer():
         num_params = self.count_parameters(self.model)
         self.print_log(f'# Parameters: {num_params}')
         self.print_log(f'Model size : {num_params/ (1024 ** 2):.2f} MB')
+    
+    def save_config(self,src_path, desc_path) -> None:  
+        print(f'{desc_path}/{src_path.rpartition("/")[-1]}') 
+        shutil.copy(src_path, f'{desc_path}/{src_path.rpartition("/")[-1]}')
 
     def count_parameters(self, model):
             # return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -330,7 +336,7 @@ class Trainer():
                 batch_size=self.arg.batch_size,
                 shuffle=True,
                 num_workers=self.arg.num_worker)
-            
+            self.distribution_viz(norm_train['labels'], self.arg.work_dir, 'train')
             
             self.data_loader['val'] = torch.utils.data.DataLoader(
                 dataset=Feeder(**self.arg.val_feeder_args,
@@ -341,6 +347,7 @@ class Trainer():
                 batch_size=self.arg.batch_size,
                 shuffle=True,
                 num_workers=self.arg.num_worker)
+            self.distribution_viz(norm_val['labels'], self.arg.work_dir, 'val')
         else:
             if self.arg.dataset == 'utd':
                 self.test_data =  utd_processing(mode = 'test', 
@@ -476,6 +483,9 @@ class Trainer():
             #print(torch.argmax(F.log_softmax(logits,dim =1), 1))
             #print(targets)
             #loss = self.criterion(masks, logits, targets)
+            # predictions = F.softmax(logits, dim = -1)
+            # print(f"Predictions : {torch.argmax(predictions,1)}")
+            # print(f"Targets: {targets}")
             loss = self.criterion(logits, targets)
             loss.mean().backward()
             self.optimizer.step()
@@ -577,6 +587,7 @@ class Trainer():
         self.print_log('{} Loss: {:4f}. {} Acc: {:2f}% f1: {:2f}'.format(loader_name.capitalize(),loss,loader_name.capitalize(), accuracy, f1))
         if self.arg.phase == 'train':
             if accuracy > self.best_accuracy :
+                    self.best_loss = loss
                     self.best_accuracy = accuracy
                     self.best_f1 = f1
                     #state_dict = self.model.state_dict()
@@ -661,6 +672,7 @@ if __name__ == "__main__":
     if p.config is not None:
         with open(p.config, 'r') as f:
             default_arg = yaml.safe_load(f)
+        
         key = vars(p).keys()
         for k in default_arg.keys():
             if k not in key:
@@ -669,6 +681,7 @@ if __name__ == "__main__":
         parser.set_defaults(**default_arg)
 
     arg = parser.parse_args()
+
     init_seed(arg.seed)
     trainer = Trainer(arg)
     trainer.start()

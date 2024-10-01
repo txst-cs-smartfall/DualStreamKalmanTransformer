@@ -1,5 +1,7 @@
 import scipy 
 from scipy.io import loadmat
+import numpy as np
+from scipy.signal import butter, filtfilt
 import glob
 import numpy as np
 import pandas as pd
@@ -114,9 +116,13 @@ def bmhad_processing(data_dir = 'data/berkley_mhad', mode = 'train', acc_window_
 
     return dataset
 
-def sf_processing(data_dir = '/home/bgu9/Fall_Detection_KD_Multimodal/data/smartfallmm', subjects = None,
+def butterworth_filter(data, cutoff, fs, order=4, filter_type='low'):
+    nyquist = 0.5 * fs  # Nyquist frequency
+    normal_cutoff = cutoff / nyquist  # Normalized cutoff frequency
+    b, a = butter(order, normal_cutoff, btype=filter_type, analog=False)
+    return filtfilt(b, a, data, axis=0)  
 
-
+def sf_processing(data_dir = '/Users/tousif/LightHART/data/smartfallmm', subjects = None,
                     skl_window_size = 32, 
                     num_windows = 10,
                     acc_window_size = 32,
@@ -124,22 +130,29 @@ def sf_processing(data_dir = '/home/bgu9/Fall_Detection_KD_Multimodal/data/smart
     skl_set = []
     acc_set = []
     label_set = []
-    file_paths = glob.glob(f'{data_dir}/old_participants/Skeleton/*.csv')
+    #file_paths = glob.glob(f'{data_dir}/combined/skeleton/*.csv')
+    file_paths = glob.glob(f'{data_dir}/Student_Data/Skeleton/*.csv')
     print("file paths {}".format(len(file_paths)))
     #skl_path = f"{data_dir}/{mode}_skeleton_op/"
     #skl_path = f"{data_dir}/{mode}/skeleton/"
-    acc_dir = f"{data_dir}/student_participants/accelerometer/watch_accelerometer"
-    phone_dir = f"{data_dir}/student_participants/accelerometer/phone_accelerometer"
+
+    acc_dir = f"{data_dir}/Student_Data/Accelerometer_Data/Meta_wrist_Accelerometer"
+    phone_dir = f"{data_dir}/Student_Data/Accelerometer_Data/Meta_hip_Accelerometer"
     pattern = r'S\d+A\d+T\d+'
     act_pattern = r'(A\d+)'
     label_pattern = r'(\d+)'
 
     for idx,path in enumerate(file_paths):
-        desp = re.findall(pattern, file_paths[idx])[0]
+        desp = re.findall(pattern, path)[0]
         if not int(desp[1:3]) in subjects:
             continue
         act_label = re.findall(act_pattern, path)[0]
-        label = int(int(re.findall(label_pattern, act_label)[0])>9)
+        label = int(re.findall(label_pattern, act_label)[0]) -1 
+        if label > 8 :
+            continue
+
+        # if label > 8 :
+        #     continue
         acc_path = f'{acc_dir}/{desp}.csv'
 
         phone_path = f'{phone_dir}/{desp}.csv'
@@ -155,10 +168,13 @@ def sf_processing(data_dir = '/home/bgu9/Fall_Detection_KD_Multimodal/data/smart
              continue
 
         acc_data = acc_df.bfill().iloc[2:, -3:].to_numpy(dtype=np.float32)
+
         phone_data = phone_df.bfill().iloc[2:, -3:].to_numpy(dtype=np.float32)
+        
         
         skl_df  = pd.read_csv(path, index_col =False).dropna()
         skl_data = skl_df.bfill().iloc[:, -96:].to_numpy(dtype=np.float32)
+
         ######## avg poolin #########
         if  acc_data.shape[0] == 0:   
             os.remove(acc_path)
@@ -167,14 +183,16 @@ def sf_processing(data_dir = '/home/bgu9/Fall_Detection_KD_Multimodal/data/smart
             os.remove(phone_path)
             continue
         padded_acc = pad_sequence_numpy(sequence=acc_data, input_shape= acc_data.shape, max_sequence_length=acc_window_size)
+        padded_acc = butterworth_filter(data=padded_acc, cutoff=1.0, fs = 20)
         padded_phone = pad_sequence_numpy(sequence=phone_data, input_shape=phone_data.shape, max_sequence_length=acc_window_size)
-        av = calculate_angle(padded_acc, padded_phone)
+        padded_phone = butterworth_filter(data=padded_phone, cutoff=1.0, fs = 20)
         padded_skl = pad_sequence_numpy(sequence=skl_data, input_shape=skl_data.shape, max_sequence_length=skl_window_size)
 
-        combined_acc = np.concatenate((padded_acc,padded_phone), axis=1)
+        #combined_acc = np.concatenate((padded_acc, padded_phone), axis=1)
         
         skl_data = rearrange(padded_skl, 't (j c) -> t j c' , j = 32, c = 3)
-        acc_set.append(combined_acc)
+        #skl_data = torch.randn((128,32,3))
+        acc_set.append(padded_acc)
         skl_set.append(skl_data)
         label_set.append(label)
         #skl_data = rearrange(skl_df.values[:, -96:], 't (j c) -> t j c' , j = 32, c = 3)
@@ -195,7 +213,7 @@ def sf_processing(data_dir = '/home/bgu9/Fall_Detection_KD_Multimodal/data/smart
     # print(concat_acc.shape)
     # print(concat_skl.shape)
     # #np.savez('/home/bgu9/KD_Multimodal/train.npz' , data = concat_acc, labels = concat_label)
-    print(concat_acc.shape)
+    print(concat_skl.shape)
     dataset = { 'acc_data' : concat_acc,
                  'skl_data' : concat_skl, 
                  'labels': concat_label}
