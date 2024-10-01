@@ -22,63 +22,61 @@ class TransformerEncoderWAttention(nn.TransformerEncoder):
 
 
 class TransModel(nn.Module):
-    def __init__(self, data_shape:Dict[str, Tuple[int, int]] = {'inertial':(128, 3)},
+    def __init__(self,
                 mocap_frames = 128,
                 num_joints = 32,
                 acc_frames = 128,
                 num_classes:int = 8, 
-                num_heads = 4, 
-                acc_coords = 3, 
+                num_heads = 2, 
+                acc_coords = 4, 
                 av = False,
-                adepth = 2, norm_first = True, 
-                acc_embed= 8, activation = 'relu',
+                num_layer = 2, norm_first = True, 
+                embed_dim= 8, activation = 'relu',
                 **kwargs) :
         super().__init__()
         self.data_shape = (acc_frames, acc_coords)
         self.length = self.data_shape[0]
         size = self.data_shape[1]
-        self.av = av
-        if av : 
-            size = size + 3
-        
-        print(size)
+        #self.channel_embed_dim = embed_dim // 2
+        self.input_proj = nn.Sequential(nn.Conv1d(size, embed_dim, kernel_size=3, stride=1, padding='same'),
+                                         nn.Conv1d(embed_dim, embed_dim*2, kernel_size = 3, stride=1, padding='same'),
+                                         nn.Conv1d(embed_dim*2, embed_dim, kernel_size=3, stride=1, padding='same'))
 
-        self.input_proj = nn.Linear(size, acc_embed)
-        self.encoder_layer = TransformerEncoderLayer(d_model = acc_embed, activation = activation, 
+
+        self.encoder_layer = TransformerEncoderLayer(d_model = self.length,  activation = activation, 
                                                      dim_feedforward = 32, nhead = num_heads,dropout=0.5)
         
-        self.encoder = TransformerEncoderWAttention(encoder_layer = self.encoder_layer, num_layers = adepth, 
-                                          norm=nn.LayerNorm(acc_embed))
+        self.encoder = TransformerEncoderWAttention(encoder_layer = self.encoder_layer, num_layers = num_layer, 
+                                          norm=nn.LayerNorm(embed_dim))
 
-        pooled = self.length//2 + 1  
-        self.ln1 = nn.Linear(pooled*acc_embed, 64)
-        self.output = Linear(64, num_classes)
+        self.ln1 = nn.Linear(self.length, 32)
+        # self.drop1 = nn.Dropout(p = 0.5)
+        self.ln2 = nn.Linear(32, 16)
+        self.drop2 = nn.Dropout(p = 0.5)
+        self.output = Linear(16, num_classes)
         nn.init.normal_(self.output.weight, 0, math.sqrt(2. / num_classes))
     
     def forward(self, acc_data, skl_data):
 
         b, l, c = acc_data.shape
-
-
-        x = self.input_proj(acc_data) # [ 8, 64, 3]
-        x = rearrange(x,'b l c ->  l b c') #[8, 64, 3]
+        x = rearrange(acc_data, 'b l c -> b c l')
+        x = self.input_proj(x) # [ 8, 64, 3]
+        x = rearrange(x,'b c l ->  c b l') #[8, 64, 3]
         x = self.encoder(x)
         x = rearrange(x, 'c b l -> b l c')
 
-        # x = self.feature_transform(x)
-        #x = rearrange(x, 'b l c -> b c l')
-        # for i, l in enumerate(self.reduciton):
-        #     x = l(x)
 
-        x = F.max_pool1d(x, kernel_size = x.shape[-1]//2, stride = 1)
+        x = F.avg_pool1d(x, kernel_size = x.shape[-1], stride = 1)
         x = rearrange(x, 'b c f -> b (c f)')
-        x = self.ln1(x)        
-        
+        # x= self.drop1(x)
+        x = F.relu(self.ln1(x))
+        # x = self.drop2(x)
+        x = F.relu(self.ln2(x))
         x = self.output(x)
         return x
 
 if __name__ == "__main__":
-        data = torch.randn(size = (16,128,3))
+        data = torch.randn(size = (16,128,4))
         skl_data = torch.randn(size = (16,128,32,3))
         model = TransModel()
         output = model(data, skl_data)

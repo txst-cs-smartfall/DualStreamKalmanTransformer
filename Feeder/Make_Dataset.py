@@ -107,16 +107,86 @@ class UTD_mm(torch.utils.data.Dataset):
         self.channels = self.acc_data.shape[2]
         self.batch_size = batch_size
         self.transform = None
+        self.crop_size = 64
         # self.transform =  (
         #      AddNoise(scale=(0.01, 0.05)) @ 0.5  # random quantize to 10-, 20-, or 30- level sets
         #     + Drift(max_drift=(0.1, 0.5)) @ 0.4  # with 80% probability, random drift the signal up to 10% - 50%
         #     + Reverse() @ 0.5 ) # with 50% probability, reverse the sequence 
+    
+    def random_crop(self,data : torch.Tensor) -> torch.Tensor:
+        '''
+        Function to add random cropping to the data
+        Arg: 
+            data : 
+        Output: 
+            crop_data: will return croped data
+        '''
+        length = data.shape[0]
+        start_idx = np.random.randint(0, length-self.crop_size-1)
+        return data[start_idx : start_idx+self.crop_size, :]
 
     # def augment(self, data): 
     #     data = torch.transpose(data, -2, -1)
     #     transformed_data = self.transform.augment(data.numpy())
     #     data = torch.tensor(np.transpose(transformed_data))
     #     return data 
+
+    def cal_smv(self, sample : torch.Tensor) -> torch.Tensor:
+        '''
+        Function to calculate SMV
+        '''
+        mean = torch.mean(sample, dim = -2, keepdim=True)
+        zero_mean = sample - mean
+        sum_squared =  torch.sum(torch.square(zero_mean), dim=-1, keepdim=True) 
+        smv= torch.sqrt(sum_squared)
+        return smv
+    
+    def calculate_weight(self, data):
+        """
+        Calculate the magnitude (weight) of accelerometer data.
+
+        Parameters:
+        - data: A PyTorch tensor of shape (128, 3) where each row is [ax, ay, az].
+
+        Returns:
+        - A 1D PyTorch tensor of shape (128,) containing the magnitude for each row.
+        """
+        return torch.sqrt(torch.sum(data**2, dim=-1, keepdim=True))
+    
+    def calculate_pitch(self,data):
+        """
+        Calculate the pitch from accelerometer data.
+
+        Parameters:
+        - data: A PyTorch tensor of shape (128, 3) where each row is [ax, ay, az].
+
+        Returns:
+        - A 1D PyTorch tensor of shape (128,) containing the pitch angle for each row in radians.
+        """
+        ax = data[:, 0]
+        ay = data[:, 1]
+        az = data[:, 2]
+        return torch.atan2(ay, torch.sqrt(ax**2 + az**2))
+    
+
+    def calculate_roll(self,data):
+        """
+        Calculate the roll from accelerometer data.
+
+        Parameters:
+        - data: A PyTorch tensor of shape (128, 3) where each row is [ax, ay, az].
+
+        Returns:
+        - A 1D PyTorch tensor of shape (128,) containing the roll angle for each row in radians.
+        """
+        ax = data[:, 0]
+        ay = data[:, 1]
+        az = data[:, 2]
+        return torch.atan2(ax, torch.sqrt(ay**2 + az**2))
+
+
+
+
     
     def __len__(self):
         return self.num_samples
@@ -138,8 +208,18 @@ class UTD_mm(torch.utils.data.Dataset):
             aug_skl = rearrange(aug_skl, 'T (N C) -> T N C', N = N , C = C)
             skl_data = aug_skl
             acc_data = self.augment(acc_data)
-                
-        data['acc_data'] = acc_data    
+
+        #data['acc_data'] = self.random_crop(acc_data)
+        #calculating smv 
+        watch_smv = self.cal_smv(acc_data)
+        phone_smv = self.cal_smv(acc_data[:,3:])
+        #phone_smv = self.cal_smv(acc_data)
+        weight = self.calculate_weight(acc_data)
+        #roll = torch.unsqueeze(self.calculate_roll(acc_data), dim = 1)
+        #pitch = torch.unsqueeze(self.calculate_pitch(acc_data),dim =1)
+        acc_data = torch.cat(( watch_smv,acc_data), dim = -1)
+        #data['acc_data'] = self.random_crop(acc_data)
+        data['acc_data'] = acc_data
         data['skl_data'] = skl_data
         label = self.labels[index]
         #data, label = self.transform(data, label)
@@ -154,6 +234,19 @@ class UTD_aus(torch.utils.data.Dataset):
         print(acc_data.shape)
         print(skl_data.shape)
 
+def cal_smv(sample : torch.Tensor) -> torch.Tensor:
+        '''
+        Function to calculate SMV
+        '''
+        mean = torch.mean(sample, dim = -2, keepdim=True)
+        zero_mean = sample - mean
+        sum_squared =  torch.sum(torch.square(zero_mean), dim=-1, keepdim=True) 
+        smv= torch.sqrt(sum_squared)
+        processed_data = torch.cat((sample, smv), dim = -1)
+        return processed_data
+
+
 
 if __name__ == "__main__":
-    loader = UTD_aus()
+    data = torch.randn((8, 128, 3))
+    smv = cal_smv(data)
