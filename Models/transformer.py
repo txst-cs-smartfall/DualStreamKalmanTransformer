@@ -28,7 +28,7 @@ class TransModel(nn.Module):
                 acc_frames = 128,
                 num_classes:int = 8, 
                 num_heads = 2, 
-                acc_coords = 4, 
+                acc_coords = 3, 
                 av = False,
                 num_layer = 2, norm_first = True, 
                 embed_dim= 8, activation = 'relu',
@@ -63,7 +63,8 @@ class TransModel(nn.Module):
         x = self.input_proj(x) # [ 8, 64, 3]
         x = rearrange(x,'b c l ->  c b l') #[8, 64, 3]
         x = self.encoder(x)
-        x = rearrange(x, 'c b l -> b l c')
+        x = rearrange(x ,'c b l -> b l c')
+        #x = rearrange(x, 'c b l -> b l c')
 
 
         x = F.avg_pool1d(x, kernel_size = x.shape[-1], stride = 1)

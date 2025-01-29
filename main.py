@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, f1_score
 
 #local import 
-from utils.dataset import prepare_smartfallmm, filter_subjects
+from utils.dataset import prepare_smartfallmm, split_by_subjects
 
 
 def get_args():
@@ -261,9 +261,10 @@ class Trainer():
             # dataset class for futher processing
             builder = prepare_smartfallmm(self.arg)
 
-            norm_train = filter_subjects(builder, self.train_subjects)
-            norm_val = filter_subjects(builder , self.test_subject)
-
+            norm_train = split_by_subjects(builder, self.train_subjects) 
+            # print(norm_train['skeleton'].shape)
+            norm_val = split_by_subjects(builder , self.test_subject)
+            # print(norm_val['skeleton'].shape)
             #validation dataset
             self.data_loader['train'] = torch.utils.data.DataLoader(
                 dataset=Feeder(**self.arg.train_feeder_args,
@@ -285,7 +286,7 @@ class Trainer():
         else:
             # if self.arg.dataset == 'smartfallmm':
             builder = prepare_smartfallmm(self.arg)
-            norm_test = filter_subjects(builder , self.test_subject)
+            norm_test = split_by_subjects(builder , self.test_subject)
             self.data_loader['test'] = torch.utils.data.DataLoader(
                 dataset=Feeder(**self.arg.test_feeder_args, dataset = norm_test),
                 batch_size=self.arg.test_batch_size,
@@ -416,6 +417,7 @@ class Trainer():
             with torch.no_grad():
                 train_loss += loss.mean().item()
                 #accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
+                #print(torch.argmax(F.log_softmax(logits,dim =1), 1))
                 accuracy += (torch.argmax(F.log_softmax(logits,dim =1), 1) == targets).sum().item()
                 
             cnt += len(targets) 
@@ -512,7 +514,7 @@ class Trainer():
                 results = self.create_df()
                 #for i in range(len(self.arg.subjects)-1): 
                     #train_subjects = list(filter(lambda x : x not in test_subject, self.arg.subjects))
-                test_subject = self.arg.subjects[-6:]
+                test_subject = self.arg.subjects[-1:]
                 train_subjects = [x for x in self.arg.subjects if  x not in test_subject]
                 self.test_subject = test_subject
                 self.train_subjects = train_subjects

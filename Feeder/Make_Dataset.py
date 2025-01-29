@@ -94,7 +94,6 @@ class Bmhad_mm(torch.utils.data.Dataset):
 
 class UTD_mm(torch.utils.data.Dataset):
     def __init__(self, dataset, batch_size):
-
         self.inertial_modality = next((modality for modality in dataset if modality in ['accelerometer', 'gyroscope']), None)
         self.acc_data = dataset[self.inertial_modality]
         self.labels = dataset['labels']
@@ -187,7 +186,7 @@ class UTD_mm(torch.utils.data.Dataset):
         data = dict()
 
         watch_smv = self.cal_smv(acc_data)
-        acc_data = torch.cat(( watch_smv,acc_data), dim = -1)
+        #acc_data = torch.cat(( watch_smv,acc_data), dim = -1)
         data[self.inertial_modality] = acc_data
         data['skeleton'] = skl_data
         label = self.labels[index]

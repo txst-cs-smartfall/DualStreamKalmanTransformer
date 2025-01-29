@@ -35,7 +35,7 @@ student_args:
   num_heads: 2
 
 dataset_args: 
- mode: 'avg_pool'
+ mode: 'sliding_window'
  max_length: 128 
  #change task to 'har' for Human activity recognition
  task : 'fd'

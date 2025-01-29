@@ -233,13 +233,17 @@ class SmartFallMM:
                 # Load the files
                 for root, _, files in os.walk(modality_dir):
                     for file in files:
-                        if file.endswith(('.csv')):
+                        try :
+                            if file.endswith(('.csv')):
                             # Extract information based on the filename
-                            subject_id = int(file[1:3])  # Assuming S001 format for subject
-                            action_id = int(file[4:6])  # Assuming A001 format for action
-                            sequence_number = int(file[7:9])  # Assuming T001 format for trial
-                            file_path = os.path.join(root, file)
-                            modality.add_file(subject_id, action_id, sequence_number, file_path)
+                                subject_id = int(file[1:3])  # Assuming S001 format for subject
+                                action_id = int(file[4:6])  # Assuming A001 format for action
+                                sequence_number = int(file[7:9])  # Assuming T001 format for trial
+                                file_path = os.path.join(root, file)
+                                modality.add_file(subject_id, action_id, sequence_number, file_path)
+                        except:
+                            print(file)
+
 
     def match_trials(self) -> None:
         """
@@ -328,7 +332,7 @@ def prepare_smartfallmm(arg )  -> DatasetBuilder:
                                 arg.dataset_args['task'])
     return builder
 
-def filter_subjects(builder, subjects) -> Dict[str, np.ndarray]:
+def split_by_subjects(builder, subjects) -> Dict[str, np.ndarray]:
     '''
     Function to Filter out expects subjects
     '''
