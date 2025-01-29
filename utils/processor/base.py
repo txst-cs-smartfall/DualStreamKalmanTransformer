@@ -14,7 +14,7 @@ def csvloader(file_path: str, **kwargs):
     num_col = file_data.shape[1]
     num_extra_col = num_col % 3
     cols_to_select = num_col - num_extra_col
-    activity_data = file_data.iloc[2:, -cols_to_select:].to_numpy(dtype=np.float32)
+    activity_data = file_data.iloc[2:, -3:].to_numpy(dtype=np.float32)
     return activity_data
 
 def matloader(file_path: str, **kwargs):
@@ -73,7 +73,6 @@ def sliding_window(data : np.ndarray, clearing_time_index : int, max_time : int,
     '''
     Sliding Window
     '''
-
     assert clearing_time_index >= sub_window_size - 1 , "Clearing value needs to be greater or equal to (window size - 1)"
     start = clearing_time_index - sub_window_size + 1 
 
@@ -105,7 +104,7 @@ class Processor(ABC):
         self.kwargs = kwargs
 
 
-    def _set_input_shape(self, sequence: np.ndarray) -> List[int]:
+    def set_input_shape(self, sequence: np.ndarray) -> List[int]:
         '''
         returns the shape of the inputj
 
@@ -129,14 +128,21 @@ class Processor(ABC):
         assert file_type in ['csv', 'mat'], f'Unsupported file type {file_type}'
 
         return LOADER_MAP[file_type]
-
-    def process(self):
+    
+    def load_file(self):
         '''
-        function implementation to process data
+        
         '''
         loader = self._import_loader(self.file_path)
         data = loader(self.file_path, **self.kwargs)
-        self._set_input_shape(data)
+        self.set_input_shape(data)
+        return data
+
+    def process(self, data):
+        '''
+        function implementation to process data
+        '''
+
         if self.mode == 'avg_pool':
             data = pad_sequence_numpy(sequence=data, max_sequence_length=self.max_length,
                                       input_shape=self.input_shape)
@@ -144,7 +150,7 @@ class Processor(ABC):
         else: 
             data = sliding_window(data=data, clearing_time_index=self.max_length-1, 
                                   max_time=self.input_shape[0],
-                                   sub_window_size =self.max_length, stride_size=1)
+                                   sub_window_size =self.max_length, stride_size=10)
         return data
 
             
