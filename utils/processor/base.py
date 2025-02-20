@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np 
 import torch
 import torch.nn.functional as F
+from scipy.signal import find_peaks
 
 def csvloader(file_path: str, **kwargs):
     '''
@@ -89,13 +90,39 @@ def sliding_window(data : np.ndarray, clearing_time_index : int, max_time : int,
     #labels = np.round(np.mean(labels[sub_windows], axis=1))
     return data[sub_windows]
 
+def selective_sliding_window(data: np.ndarray, length: int , window_size: int , stride_size : int, height : int, distance : int) -> np.array: 
+    sqrt_sum = np.sqrt(np.sum(data**2, axis = 1))
+    peaks , _ = find_peaks(sqrt_sum,height=height, distance=distance )
+    windows = []
+    for peak in peaks:
+        start = max(0, peak - window_size)
+        end = min(len(data), start + window_size)
+        # difference = length - (end-start)
+        # if difference != 0 : 
+        #     if start == 0 : 
+        #         end = end + difference
+        #     elif 
+        if data[start:end].shape[0] < window_size:
+            continue
+        windows.append(data[start:end])
+
+
+            
+                     
+    #windows = [data[max(0, peak - W): min(len(data), peak + W)] for peak in peaks]
+    return windows
+
+
+
+
 
 class Processor(ABC):
     '''
     Data Processor 
     '''
-    def __init__(self, file_path:str, mode : str, max_length: str, **kwargs):
+    def __init__(self, file_path:str, mode : str, max_length: str, label: int, **kwargs):
         assert mode in ['sliding_window', 'avg_pool'], f'Processing mode: {mode} is undefined'
+        self.label  = label 
         self.mode = mode
         self.max_length = max_length
         self.data = []
@@ -129,12 +156,12 @@ class Processor(ABC):
 
         return LOADER_MAP[file_type]
     
-    def load_file(self):
+    def load_file(self, file_path: str):
         '''
-        
+        Loads file given file path
         '''
-        loader = self._import_loader(self.file_path)
-        data = loader(self.file_path, **self.kwargs)
+        loader = self._import_loader(file_path)
+        data = loader(file_path, **self.kwargs)
         self.set_input_shape(data)
         return data
 
@@ -148,9 +175,18 @@ class Processor(ABC):
                                       input_shape=self.input_shape)
         
         else: 
-            data = sliding_window(data=data, clearing_time_index=self.max_length-1, 
-                                  max_time=self.input_shape[0],
-                                   sub_window_size =self.max_length, stride_size=10)
+            if self.label == 1: 
+                #phone height = 25, distance = 200
+                
+                data = selective_sliding_window(data, length = self.input_shape[0],
+                                                window_size= self.max_length, stride_size=10, height=1.4, distance=50)
+            else: 
+                #phone height = 15, distance = 500
+                data = selective_sliding_window(data, length = self.input_shape[0],
+                                                window_size= self.max_length, stride_size=10, height=1.2, distance=100)
+                # data = sliding_window(data=data, clearing_time_index=self.max_length-1, 
+                #                   max_time=self.input_shape[0],
+                #                    sub_window_size =self.max_length, stride_size=10)
         return data
 
             

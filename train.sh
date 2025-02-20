@@ -1,9 +1,9 @@
 #!/bin/bash
 teacher_weights="spTransformer"
-student_dir="exps/smartfall_har/student/sliding_window_phone_accelerometer"
+student_dir="exps/smartfall_har/student/test"
 work_dir="exps/smartfall_har/kd/student/watchgyro_divid3bw20"
 student_weights="ttfstudent"
-teacher_dir="$HOME/LightHART/exps/smartfall_fall/teacher/with_new1"
+teacher_dir="$HOME/LightHART/exps/smartfall_har/teacher/test"
 result_file="result.txt"
 
 # weights="berkley_best.pt"
