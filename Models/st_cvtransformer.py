@@ -194,7 +194,6 @@ class MMTransformer(nn.Module):
             return x #b x St 
         return x
     def forward(self, acc_data, skl_data):
-
         #Input: B X Mocap_frames X Num_joints X in_channs
         b, f, j, c = skl_data.shape
         j = j + 1

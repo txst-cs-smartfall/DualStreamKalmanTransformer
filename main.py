@@ -10,7 +10,7 @@ import time
 import shutil
 import argparse
 import yaml
-
+from copy import deepcopy
 #environmental import
 import numpy as np 
 import pandas as pd
@@ -144,13 +144,22 @@ class Trainer():
         self.train_loss_summary = []
         self.val_loss_summary = []
         self.best_f1 = 0
-        self.best_loss = 0 
+        self.best_loss = float('inf')
         self.best_accuracy = 0 
+        self.test_accuracy = 0 
+        self.test_f1 = 0
         self.train_subjects = []
-        self.test_subject = []
+        self.val_subject = None
+        self.test_subject = None
         self.optimizer = None
+        self.norm_train = None
+        self.norm_val = None
+        self.norm_test = None
         self.data_loader = dict()
-        self.intertial_modality = (lambda x: next((modality for modality in x if modality != 'skeleton'), None))(arg.dataset_args['modalities'])
+        self.model_path = f'{self.arg.work_dir}/{self.arg.model_saved_name}.pt'
+        #self.intertial_modality = (lambda x: next((modality for modality in x if modality != 'skeleton'), None))(arg.dataset_args['modalities'])
+        self.inertial_modality = [modality  for modality in arg.dataset_args['modalities'] if modality != 'skeleton']
+        self.fuse = len(self.inertial_modality) > 1 
         if not os.path.exists(self.arg.work_dir):
             os.makedirs(self.arg.work_dir)                     
             self.save_config(arg.config, arg.work_dir)
@@ -185,7 +194,9 @@ class Trainer():
         for buffer in model.buffers():
             total_size += buffer.nelement() * buffer.element_size()
         return total_size
-            
+    
+    def has_empty_value(self, *lists):
+        return any(len(lst) == 0 for lst in lists)
     def load_model(self, model, model_args):
         '''
         Function to load model 
@@ -207,7 +218,7 @@ class Trainer():
         Load weights to the load 
         '''
 
-        self.model.load_state_dict(torch.load(self.arg.weights))
+        self.model.load_state_dict(torch.load(self.model_path))
     
     def load_optimizer(self) -> None:
         '''
@@ -261,38 +272,43 @@ class Trainer():
             # dataset class for futher processing
             builder = prepare_smartfallmm(self.arg)
 
-            norm_train = split_by_subjects(builder, self.train_subjects) 
+            self.norm_train = split_by_subjects(builder, self.train_subjects, self.fuse) 
             # print(norm_train['skeleton'].shape)
-            norm_val = split_by_subjects(builder , self.test_subject)
-            # print(norm_val['skeleton'].shape)
+            self.norm_val = split_by_subjects(builder , self.val_subject, self.fuse)          # print(norm_val['skeleton'].shape)
+            if self.has_empty_value(list(self.norm_val.values())):
+                return False
+
             #validation dataset
             self.data_loader['train'] = torch.utils.data.DataLoader(
                 dataset=Feeder(**self.arg.train_feeder_args,
-                               dataset = norm_train),
+                               dataset = self.norm_train),
                 batch_size=self.arg.batch_size,
                 shuffle=True,
                 num_workers=self.arg.num_worker)
             
-            self.distribution_viz(norm_train['labels'], self.arg.work_dir, 'train')
+            self.distribution_viz(self.norm_train['labels'], self.arg.work_dir, 'train')
             
             self.data_loader['val'] = torch.utils.data.DataLoader(
                 dataset=Feeder(**self.arg.val_feeder_args,
-                               dataset = norm_val
+                               dataset = self.norm_val
                                ),
                 batch_size=self.arg.batch_size,
                 shuffle=True,
                 num_workers=self.arg.num_worker)
-            self.distribution_viz(norm_val['labels'], self.arg.work_dir, 'val')
-        else:
-            # if self.arg.dataset == 'smartfallmm':
-            builder = prepare_smartfallmm(self.arg)
-            norm_test = split_by_subjects(builder , self.test_subject)
+            self.distribution_viz(self.norm_val['labels'], self.arg.work_dir, 'val')
+        # else:
+        #     # if self.arg.dataset == 'smartfallmm':
+        #     builder = prepare_smartfallmm(self.arg)
+            self.norm_test = split_by_subjects(builder , self.test_subject, self.fuse)
+            if self.has_empty_value(list(self.norm_test.values())):
+                    return  False
             self.data_loader['test'] = torch.utils.data.DataLoader(
-                dataset=Feeder(**self.arg.test_feeder_args, dataset = norm_test),
+                dataset=Feeder(**self.arg.test_feeder_args, dataset = self.norm_test),
                 batch_size=self.arg.test_batch_size,
                 shuffle=True,
                 num_workers=self.arg.num_worker)
 
+            return True
 
     def record_time(self):
         '''
@@ -400,7 +416,7 @@ class Trainer():
 
         for batch_idx, (inputs, targets, idx) in enumerate(process):
             with torch.no_grad():
-                acc_data = inputs[self.intertial_modality].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
+                acc_data = inputs['accelerometer'].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
                 skl_data = inputs['skeleton'].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
                 targets = targets.to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
 
@@ -440,7 +456,7 @@ class Trainer():
         self.val_loss_summary.append(val_loss)
 
     
-    def eval(self, epoch, loader_name = 'test', result_file = None):
+    def eval(self, epoch, loader_name = 'val', result_file = None):
         '''
         Evaluates the models performance
         '''
@@ -461,7 +477,7 @@ class Trainer():
         process = tqdm(self.data_loader[loader_name], ncols=80)
         with torch.no_grad():
             for batch_idx, (inputs, targets, idx) in enumerate(process):
-                acc_data = inputs[self.intertial_modality].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
+                acc_data = inputs['accelerometer'].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
                 skl_data = inputs['skeleton'].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
                 targets = targets.to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
 
@@ -485,15 +501,17 @@ class Trainer():
                 f_r.write(str(x) +  '==>' + str(true[i]) + '\n')
         
         self.print_log('{} Loss: {:4f}. {} Acc: {:2f}% f1: {:2f}'.format(loader_name.capitalize(),loss,loader_name.capitalize(), accuracy, f1))
-        if self.arg.phase == 'train':
-            if accuracy > self.best_accuracy :
+        if loader_name == 'val':
+            if loss < self.best_loss :
                     self.best_loss = loss
                     self.best_accuracy = accuracy
                     self.best_f1 = f1
-                    torch.save(self.model, f'{self.arg.work_dir}/{self.arg.model_saved_name}.pth')
+                    
+                    torch.save(deepcopy(self.model.state_dict()), self.model_path)
                     self.print_log('Weights Saved')
         else: 
-            return pred_list, label_list, wrong_idx
+            self.test_accuracy = accuracy
+            self.test_f1 = f1
         return loss       
 
     def start(self):
@@ -512,35 +530,47 @@ class Trainer():
                 self.print_log('Parameters: \n{}\n'.format(str(vars(self.arg))))
             
                 results = self.create_df()
-                #for i in range(len(self.arg.subjects)-1): 
-                    #train_subjects = list(filter(lambda x : x not in test_subject, self.arg.subjects))
-                test_subject = self.arg.subjects[-1:]
-                train_subjects = [x for x in self.arg.subjects if  x not in test_subject]
-                self.test_subject = test_subject
-                self.train_subjects = train_subjects
-                self.model = self.load_model(self.arg.model, self.arg.model_args)
-                self.print_log(f'Model Parameters: {self.count_parameters(self.model)}')
-                self.load_data()
-                self.load_optimizer()
+                for i in range(len(self.arg.subjects)-1): 
+                    self.best_loss = float('inf')
+                    test_subject = self.arg.subjects[i]
+                    val_subject = self.arg.subjects[i+1]
+                    # fold_train_subjects = copy.deepcopy(self.arg.subjects)
+                    # fold_train_subjects.drop(i)
+                    train_subjects = list(filter(lambda x : x not in [test_subject, val_subject], self.arg.subjects))
+                # test_subject = self.arg.subjects[-3:]
+                # train_subjects = [x for x in self.arg.subjects if  x not in test_subject]
+                    self.val_subject = [val_subject]
+                    self.test_subject = [test_subject]
+                    self.train_subjects = train_subjects
+                    self.model = self.load_model(self.arg.model, self.arg.model_args)
+                    self.print_log(f'Model Parameters: {self.count_parameters(self.model)}')
+                    if not self.load_data():
+                        continue
 
-                self.global_step = self.arg.start_epoch * len(self.data_loader['train']) / self.arg.batch_size
-                for epoch in range(self.arg.start_epoch, self.arg.num_epoch):
-                    self.train(epoch)
-                self.print_log(f'Train Subjects : {self.train_subjects}')
-                self.print_log(f' ------------ Test Subject {self.test_subject} -------')
-                self.print_log(f'Best accuracy for : {self.best_accuracy}')
-                self.print_log(f'Best F-Score: {self.best_f1}')
-                self.print_log(f'Model name: {self.arg.work_dir}')
-                self.print_log(f'Weight decay: {self.arg.weight_decay}')
-                self.print_log(f'Base LR: {self.arg.base_lr}')
-                self.print_log(f'Batch Size: {self.arg.batch_size}')
-                self.print_log(f'seed: {self.arg.seed}')
-                self.loss_viz(self.train_loss_summary, self.val_loss_summary)
-                subject_result = pd.Series({'test_subject' : str(self.test_subject), 'train_subjects' :str(self.train_subjects), 
-                                            'accuracy':round(self.best_accuracy,2), 'f1_score':round(self.best_f1, 2)})
-                results.loc[len(results)] = subject_result
-                self.best_accuracy = 0
-                self.best_f1 = 0
+                    self.load_optimizer()
+
+                    self.global_step = self.arg.start_epoch * len(self.data_loader['train']) / self.arg.batch_size
+                    for epoch in range(self.arg.start_epoch, self.arg.num_epoch):
+                        self.train(epoch)
+                    self.print_log(f'Train Subjects : {self.train_subjects}')
+                    self.load_model(self.arg.model,self.arg.model_args)
+                    self.load_weights()
+                    self.model.eval()
+                    self.print_log(f' ------------ Test Subject {self.test_subject[0]} -------')
+                    self.eval(epoch = 0 , loader_name='test')
+                    self.print_log(f'Test accuracy for : {self.test_accuracy}')
+                    self.print_log(f'Test F-Score: {self.test_f1}')
+                    # self.print_log(f'Model name: {self.arg.work_dir}')
+                    # self.print_log(f'Weight decay: {self.arg.weight_decay}')
+                    # self.print_log(f'Base LR: {self.arg.base_lr}')
+                    # self.print_log(f'Batch Size: {self.arg.batch_size}')
+                    # self.print_log(f'seed: {self.arg.seed}')
+                    self.loss_viz(self.train_loss_summary, self.val_loss_summary)
+                    subject_result = pd.Series({'test_subject' : str(self.test_subject), 'train_subjects' :str(self.train_subjects), 
+                                                'accuracy':round(self.test_accuracy,2), 'f1_score':round(self.test_f1, 2)})
+                    results.loc[len(results)] = subject_result
+                    self.best_accuracy = 0
+                    self.best_f1 = 0
                 results.to_csv(f'{self.arg.work_dir}/scores.csv')
                     
 

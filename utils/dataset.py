@@ -312,7 +312,7 @@ class SmartFallMM:
                         for sensor in sensors:
                             self.select_sensor(modality, sensor)
 
-        # Load files for the selected sensors and skeleton data
+        # Load files for the selected sensors and skeleton data)
         self.load_files()
 
         # Match trials across the modalities
@@ -332,12 +332,13 @@ def prepare_smartfallmm(arg )  -> DatasetBuilder:
                                 arg.dataset_args['task'])
     return builder
 
-def split_by_subjects(builder, subjects) -> Dict[str, np.ndarray]:
+def split_by_subjects(builder, subjects, fuse) -> Dict[str, np.ndarray]:
     '''
     Function to Filter out expects subjects
     '''
-    builder.make_dataset(subjects)
+    builder.make_dataset(subjects, fuse)
     norm_data = builder.normalization()
+    #norm_data = builder.data
     return norm_data
 
 if __name__ == "__main__":
