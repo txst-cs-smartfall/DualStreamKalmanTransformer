@@ -32,32 +32,33 @@ class TransModel(nn.Module):
                 acc_coords = 3, 
                 av = False,
                 num_layer = 2, norm_first = True, 
-                embed_dim= 32, activation = 'relu',
+                embed_dim= 16, activation = 'relu',
                 **kwargs) :
         super().__init__()
 
+        ##### uncomment if want to test embedding network ##########
         # self.ts2vec_model = TSEncoder(input_dims = acc_coords, output_dims= 64)
         # self.embeding_model = torch.optim.swa_utils.AveragedModel(self.ts2vec_model)
         # self.embeding_model.load_state_dict(torch.load('/home/bgu9/LightHART/Models/model.pkl'))
         # self.freeze_pretrained()
+
         self.data_shape = (acc_frames, acc_coords)
         self.length = self.data_shape[0]
         size = self.data_shape[1]
-        #self.channel_embed_dim = embed_dim // 2
         self.input_proj = nn.Sequential(nn.Conv1d(4, embed_dim, kernel_size=8, stride=1, padding='same'), 
                                         nn.BatchNorm1d(embed_dim))
-                                        #  nn.Conv1d(embed_dim, embed_dim*2, kernel_size =3, stride=1, padding='same'),
-                                        #  nn.Conv1d(embed_dim*2, embed_dim, kernel_size=3, stride=1, padding='same'))
 
 
-        #dropout = 0.1
+
+        #dropout = 0.3 best
         self.encoder_layer = TransformerEncoderLayer(d_model = embed_dim,  activation = activation, 
-                                                     dim_feedforward =embed_dim*2, nhead = num_heads,dropout=0.3)
+                                                     dim_feedforward =embed_dim*2, nhead = num_heads,dropout=0.5)
         
         self.encoder = TransformerEncoderWAttention(encoder_layer = self.encoder_layer, num_layers = num_layer, 
                                           norm=nn.LayerNorm(embed_dim))
 
-        self.output = nn.Linear(self.length, num_classes)
+        self.output = nn.Linear(embed_dim, num_classes)
+        self.temporal_norm = nn.LayerNorm(embed_dim)
         # self.ln1 = nn.Conv1d(64,32, kernel_size=3, stride=1, padding = 1)
         # self.bn1 = nn.BatchNorm1d(32)
         # self.drop1 = nn.Dropout(p = 0.5)
@@ -66,7 +67,7 @@ class TransModel(nn.Module):
         # self.drop2 = nn.Dropout(p = 0.5)
         
         # self.output = Linear(16, num_classes)
-        nn.init.normal_(self.output.weight, 0, math.sqrt(2. / num_classes))
+        #nn.init.normal_(self.output.weight, 0, math.sqrt(2. / num_classes))
     
     def freeze_pretrained(self):
          for params in self.embeding_model.parameters(): 
@@ -96,26 +97,19 @@ class TransModel(nn.Module):
         x = self.encoder(x)
         x = rearrange(x ,'l b c -> b l c')
 
-
-
-        
-        ###### for conv #######
-        # x = rearrange(x, 'b f c -> b c f')
-        # x = self.ln1(x)
-        # x = self.bn1(x)
-        # x = F.relu(x)
-        # x = self.drop2(x)
-        # feature =self.ln2(x)
-        # x = self.bn2(feature)
-        # x = F.relu(x)
-        feature = rearrange(x, 'b l c -> b c l' )
+        x = self.temporal_norm(x)
+        #feature = rearrange(x, 'b l c -> b c l' )
+        feature = x
+        # feature = F.avg_pool1d(feature, kernel_size=feature.shape[-1], stride=1)
+        # feature = torch.flatten(feature, 1)
+        x = rearrange(x, 'b f c -> b c f')
         x = F.avg_pool1d(x, kernel_size = x.shape[-1], stride = 1)
         x = rearrange(x, 'b c f -> b (c f)')
         x = self.output(x)
         return x , feature
 
 if __name__ == "__main__":
-        data = torch.randn(size = (16,128,3))
+        data = torch.randn(size = (16,128,4))
         skl_data = torch.randn(size = (16,128,32,3))
         model = TransModel()
         output = model(data, skl_data, epochs = 20)
