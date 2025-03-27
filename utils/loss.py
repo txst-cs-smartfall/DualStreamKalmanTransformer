@@ -6,35 +6,49 @@ class DistillationLoss(nn.Module):
     '''
     Knowledge Distillation Loss
     '''
-    def __init__(self, temperature=2.0, alpha=0.75):
+    def __init__(self, temperature=2.0, alpha=0.5, pos_weigths = None):
         super(DistillationLoss, self).__init__()
         self.temperature = temperature
         self.alpha = alpha
-        self.criterion = nn.CrossEntropyLoss()
-        self.embedding_loss = nn.CosineEmbeddingLoss()
+        # self.criterion = nn.CrossEntropyLoss()
+        self.bce = nn.BCEWithLogitsLoss(pos_weight=pos_weigths)
+        #self.embedding_loss = nn.CosineEmbeddingLoss()
+        self.embeddin_loss = nn.KLDivLoss(reduction='batchmean')
+        
 
     def forward(self, student_logits, teacher_logits, labels, teacher_features, student_features, target):
         # Hard loss (cross entropy between student predictions and ground truth)
-            soft_targets = nn.functional.softmax(teacher_logits / self.temperature, dim=-1)
-            soft_prob = nn.functional.log_softmax(student_logits / self.temperature, dim=-1)
+            #soft_targets = nn.functional.softmax(teacher_logits / self.temperature, dim=-1)
+            #soft_prob = nn.functional.log_softmax(student_logits / self.temperature, dim=-1)
 
             # Calculate the soft targets loss. Scaled by T**2 as suggested by the authors of the paper "Distilling the knowledge in a neural network"
-            soft_targets_loss = torch.sum(soft_targets * (soft_targets.log() - soft_prob)) / soft_prob.size()[0] * (self.temperature**2)
+            #soft_targets_loss = torch.sum(soft_targets * (soft_targets.log() - soft_prob)) / soft_prob.size()[0] * (self.temperature**2)
 
             ####### feature based ########
+
+            # #student_features = F.layer_norm(student_features, normalized_shape=(128,))
             # teacher_features = F.avg_pool1d(teacher_features, kernel_size=teacher_features.shape[-1], stride=1)
             # student_features = F.avg_pool1d(student_features, kernel_size=student_features.shape[-1], stride = 1)
             
+            # #cosine loss
             # flatten_student = torch.flatten(student_features, 1)
             # flatten_teacher = torch.flatten(teacher_features, 1)
             
-            # cosine_loss = self.embedding_loss(flatten_teacher, flatten_student, target)
-            # Calculate the true label loss
-            label_loss = self.criterion(student_logits, labels)
-            #loss = self.alpha * cosine_loss + ( 1 - self.alpha) * label_loss
+            #cosine_loss = self.embedding_loss(flatten_teacher, flatten_student, target)
 
-            # Weighted sum of the two losses
-            loss = self.alpha * soft_targets_loss + (1-self.alpha) * label_loss
+            ## kldiv between teacher and student features#####
+            soft_teacher = nn.functional.softmax(teacher_features/self.temperature, dim=-1)
+            soft_prob = nn.functional.log_softmax(student_features/self.temperature, dim=-1)
+            cosine_loss = self.embeddin_loss(soft_prob,soft_teacher)
+            # Calculate the true label loss for multiclass
+            #label_loss = self.criterion(student_logits, labels)
+            ### for feature based#####
+            
+            # ### with one logit  
+            label_loss = self.bce(student_logits.squeeze(1), labels.float())
+            loss = self.alpha * cosine_loss + ( 1 - self.alpha) * label_loss
+            # # Weighted sum of the two losses
+            # loss = self.alpha * soft_targets_loss + (1-self.alpha) * label_loss
 
 
             return loss

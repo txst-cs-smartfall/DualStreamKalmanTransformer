@@ -1,11 +1,10 @@
 #!/bin/bash
 teacher_weights="spTransformer"
-student_dir="exps/smartfall_kd/student/watch_transformer_butterworth_smv_undersample_bce"
-work_dir="exps/smartfall_fall/student/student_with_vanilla_kd"
+student_dir="exps/smartfall_fall_wokd/student/watch_not_distilled_cross_together"
+work_dir="exps/smartfall_fall_kd/student/student_with_cross_attention_distilled_together"
 student_weights="ttfstudent"
-teacher_dir="$HOME/LightHART/exps/smartfall_fall_wokd/teacher/skeleton_with_sliding_window_2025-03-18_04-51-13"
+teacher_dir="$HOME/LightHART/exps/smartfall_fall_wokd/teacher/skeleton_with_experimental"
 result_file="result.txt"
-
 # weights="berkley_best.pt"
 # work_dir="exps/bmhad_woKD/late_fusion_epoch150_alldrop0.4"
 
@@ -38,9 +37,9 @@ result_file="result.txt"
 #python3 main.py --config ./config/smartfallmm/teacher.yaml --work-dir $teacher_dir --model-saved-name $teacher_weights  --device 2 --base-lr 1e-3 --include-val True
 
 #accelerometer only experiment
-python main.py --config ./config/smartfallmm/student.yaml --work-dir $student_dir --model-saved-name $student_weights --device 2 --base-lr 1e-3 --include-val True
+python main.py --config ./config/smartfallmm/student.yaml --work-dir $student_dir --model-saved-name $student_weights --device 2  --include-val True
 #python main.py --config ./config/smartfallmm/teacher.yaml --work-dir $teacher_dir --model-saved-name $teacher_weights --device 1 --base-lr 1e-3 --include-val True
 
 
 #distillation 
-#python3 distiller.py --config ./config/smartfallmm/distill.yaml --work-dir $work_dir  --teacher-weight "$teacher_dir/$teacher_weights" --model-saved-name "$student_weights" --device 2 --base-lr 1e-3 --include-val True
+python3 distiller.py --config ./config/smartfallmm/distill.yaml --work-dir $work_dir  --teacher-weight "$teacher_dir/$teacher_weights" --model-saved-name "$student_weights" --device 2 --include-val True

@@ -8,6 +8,11 @@ import time
 from collections import OrderedDict
 
 #environmental import
+
+## visualization packages ##
+import seaborn as sns 
+import matplotlib.pyplot as plt
+
 import numpy as np 
 import pandas as pd
 import torch
@@ -18,15 +23,14 @@ from tqdm import tqdm
 import warnings
 import json
 import torch.nn.functional as F
-# from torchsummary import summary
-
-#local import 
-# from utils.dataprocessing import utd_processing , bmhad_processing,normalization
 from main import Trainer, str2bool, init_seed, import_class
 from utils.loss import DistillationLoss
+from utils.callbacks import EarlyStopping
+from Models.cross_align import CrossModalAligner
 from sklearn.metrics import f1_score, precision_score, recall_score, auc
 
-
+TEMPERATURE = 3
+ALPHA = 0.5
 
 
 def get_args():
@@ -51,7 +55,7 @@ def get_args():
     parser.add_argument('--optimizer', type = str, default = 'Adam')
     parser.add_argument('--base-lr', type = float, default = 0.001, metavar = 'LR', 
                         help = 'learning rate (default: 0.001)')
-    parser.add_argument('--weight-decay', type = float , default=0.0004)
+    parser.add_argument('--weight-decay', type = float , default=0.001)
 
     #data 
     # parser.add_argument('--train-subjects', nargs='+', type = int)
@@ -61,7 +65,7 @@ def get_args():
     #teacher model
     parser.add_argument('--teacher-model' ,default= None, help = 'Name of teacher model to load')
     parser.add_argument('--teacher-args', default= str, help = 'A dictionary for teacher args')
-    parser.add_argument('--teacher-weight', type = str, default="/home/bgu9/LightHART/exps/smartfall_fall_wokd/teacher/skeleton_with_sliding_window_2025-03-18_04-51-13/spTransformer", help= 'weight for teacher')
+    parser.add_argument('--teacher-weight', type = str, default="/home/bgu9/LightHART/exps/smartfall_fall_wokd/teacher/skeleton_with_experimental/spTransformer", help= 'weight for teacher')
 
     #student model 
     parser.add_argument('--model', default = None , help = 'Name of the student model to load' )
@@ -113,30 +117,15 @@ class Distiller(Trainer):
     def __init__(self, arg):
         super().__init__(arg)
         self.teacher_model = self.load_model(arg.teacher_model, arg.teacher_args)
+        self.cross_aligner  = self.load_aligner()
+        self.early_stop = EarlyStopping(patience=15, min_delta=.001)
 
-    # def load_optimizer(self, name = 'student'):
-        
-    #     if self.arg.optimizer == "Adam" :
-    #         self.optimizer = optim.Adam(
-    #             self.model[name].parameters(), 
-    #             lr = self.arg.base_lr,
-    #             # weight_decay=self.arg.weight_decay
-    #         )
-    #     elif self.arg.optimizer == "AdamW":
-    #         self.optimizer = optim.AdamW(
-    #             self.model[name].parameters(), 
-    #             lr = self.arg.base_lr, 
-    #             weight_decay=self.arg.weight_decay
-    #         )
-        
-    #     elif self.arg.optimizer == "sgd":
-    #         self.optimizer = optim.SGD(
-    #             self.model[name].parameters(), 
-    #             lr = self.arg.base_lr,
-    #             weight_decay = self.arg.weight_decay
-    #         )
-    #     else :
-    #        raise ValueError()
+    
+    def load_aligner(self):
+        use_cuda = torch.cuda.is_available()
+        self.output_device = self.arg.device[0] if type(self.arg.device) is list else self.arg.device
+        return CrossModalAligner(feature_dim=arg.model_args['embed_dim']).to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
+
 
     def load_teacher_weights(self):
         '''
@@ -150,8 +139,8 @@ class Distiller(Trainer):
 
     def load_loss(self):
         self.mse = torch.nn.MSELoss()
-        self.criterion = torch.nn.CrossEntropyLoss()
-        self.distillation_loss = DistillationLoss(temperature=2)
+        self.criterion = torch.nn.BCEWithLogitsLoss(pos_weight=self.pos_weights)
+        self.distillation_loss = DistillationLoss(pos_weigths=self.pos_weights,)
     
 
 
@@ -182,36 +171,32 @@ class Distiller(Trainer):
             timer['dataloader'] += self.split_time()
 
             self.optimizer.zero_grad()
-
-            # Ascent Step
-            #print("labels: ",targets)
             with torch.no_grad():
                 teacher_logits, teacher_features = self.teacher_model(acc_data.float(), skl_data.float())
             student_logits, student_features = self.model(acc_data.float(), skl_data.float(), epoch = epoch)
+            #cross_aligned_features= self.cross_aligner(student_features = student_features, teacher_features = teacher_features)
             target = torch.ones(teacher_features.shape[0]).to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
+            if epoch % 10 == 0 and batch_idx == 0 : 
+                self.viz_feature(teacher_features=teacher_features, student_features=student_features, epoch = epoch)
             loss = self.distillation_loss(student_logits=student_logits,
                                           teacher_logits=teacher_logits, labels=targets, 
                                           teacher_features = teacher_features, 
                                           student_features = student_features, 
-                                          target = target)
-            loss.mean().backward()
+                                          target = target.float())
+            loss.backward()
             self.optimizer.step()
 
             timer['model'] += self.split_time()
             with torch.no_grad():
                 train_loss += loss.sum().item()
-                #accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
-                accuracy += (torch.argmax(F.log_softmax(student_logits,dim =1), 1) == targets).sum().item()
-                teacher_accuracy += (torch.argmax(F.log_softmax(teacher_logits, dim =1),1) == targets).sum().item()
+                preds = self.cal_prediction(student_logits)
                 label_list.extend(targets.tolist())
-                pred_list.extend(torch.argmax(F.log_softmax(student_logits,dim =1) ,1).tolist())
+                pred_list.extend(preds.tolist())
                 
             cnt += len(targets) 
             timer['stats'] += self.split_time()
         train_loss /= cnt
-        accuracy *= 100. / cnt
-        precision, recall, f1, auc = self.cal_metrics(label_list, pred_list)
-
+        accuracy, f1, recall, precision, auc_score = self.cal_metrics(label_list, pred_list)
 
         self.train_loss_summary.append(train_loss)
         proportion = {
@@ -219,79 +204,20 @@ class Distiller(Trainer):
             for k, v in timer.items()
         }
         self.print_log(
-            '\tTraining Loss: {:4f}. Training Acc: {:2f}% , F1: {:2f}%, Pr: {:2f}%, Recall: {:2f}%, Auc: {:2f}%'.format(train_loss, accuracy, f1, precision, recall, auc)
+            '\tTraining Loss: {:4f},  Acc: {:2f}%, F1 score: {:2f}%, Precision: {:2f}%, Recall: {:2f}%, AUC: {:2f}%  '.format(train_loss, accuracy, f1, precision, recall, auc_score)
         )
         self.print_log('\tTime consumption: [Data]{dataloader}, [Network]{model}'.format(**proportion))
         val_loss = self.eval(epoch, loader_name='val', result_file=self.arg.result_file)
+        self.early_stop(val_loss=val_loss)
         self.val_loss_summary.append(val_loss)
 
-    # def eval(self, epoch, loader_name = 'test', result_file = None):
 
-    #     if result_file is not None : 
-    #         f_r = open (result_file, 'w')
-        
-    #     self.model['student'].eval()
-
-    #     self.print_log('Eval epoch: {}'.format(epoch+1))
-
-    #     loss = 0
-    #     cnt = 0
-    #     accuracy = 0
-    #     f1 = 0
-    #     label_list = []
-    #     pred_list = []
-    #     use_cuda = torch.cuda.is_available()
-        
-    #     #tested subject array 
-    #     process = tqdm(self.data_loader[loader_name], ncols=80)
-    #     with torch.no_grad():
-    #         for batch_idx, (inputs, targets, idx) in enumerate(process):
-    #             label_list.extend(targets.tolist())
-    #             #inputs = inputs.cuda(self.output_device)
-    #             acc_data = inputs[self.intertial_modality].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
-    #             skl_data = inputs['skeleton'].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
-    #             targets = targets.to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
-    #             #_,logits,predictions = self.model(inputs.float())
-    #             logits= self.model['student'](acc_data.float(), skl_data.float())
-    #             batch_loss = self.criterion(logits, targets)
-    #             loss += batch_loss.sum().item()
-    #             # accuracy += (torch.argmax(predictions, 1) == targets).sum().item()
-    #             # pred_list.extend(torch.argmax(predictions ,1).tolist())
-    #             accuracy += (torch.argmax(F.log_softmax(logits,dim =1), 1) == targets).sum().item()
-    #             pred_list.extend(torch.argmax(F.log_softmax(logits,dim =1) ,1).tolist())
-    #             cnt += len(targets)
-    #         loss /= cnt
-    #         accuracy *= 100./cnt
-    #         target = np.array(label_list)
-    #         y_pred = np.array(pred_list)
-    #         f1 = f1_score(target, y_pred, average='macro') * 100
-        
-    #     if result_file is not None:
-    #         predict = pred_list
-    #         true = label_list
-
-    #         for i, x in enumerate(predict):
-    #             f_r.write(str(x) +  '==>' + str(true[i]) + '\n')
-        
-    #     self.print_log('{} Loss: {:4f}. {} Acc: {:2f}%'.format(loader_name.capitalize(),loss,loader_name.capitalize(), accuracy))
-    #     if self.arg.phase == 'train':
-    #         if accuracy > self.best_accuracy :
-    #                 self.best_accuracy = accuracy
-    #                 self.best_f1 = f1
-    #                 state_dict = self.model['student'].state_dict()
-    #                 #weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in state_dict.items()])
-    #                 torch.save(self.model['student'], f'{self.arg.work_dir}/{self.arg.model_saved_name}_{self.test_subject[0]}.pth')
-    #                 self.print_log('Weights Saved')
-    #     else:
-    #         return pred_list, label_list , []
         
     def start(self):
-        #summary(self.model,[(model_args['acc_frames'],3), (model_args['mocap_frames'], model_args['num_joints'],3)] , dtypes=[torch.float, torch.float] )
         if self.arg.phase == 'train':
-                #self.print_log('Parameters: \n{}\n'.format(str(vars(self.arg))))
                                             
                 results = self.create_df()
-                for i in range(len(self.arg.subjects[:-4])): 
+                for i in range(len(self.arg.subjects[:-3])): 
                     self.train_loss_summary = []
                     self.val_loss_summary = []
                     self.best_loss = float('inf')
@@ -300,12 +226,8 @@ class Distiller(Trainer):
                     self.best_precision = float('-inf')
                     self.best_accuracy = float('-inf')
                     test_subject = self.arg.subjects[i]
-                    # fold_train_subjects = copy.deepcopy(self.arg.subjects)
-                    # fold_train_subjects.drop(i)
                     train_subjects = list(filter(lambda x : x not in [test_subject], self.arg.subjects))
-                # test_subject = self.arg.subjects[-3:]
-                # train_subjects = [x for x in self.arg.subjects if  x not in test_subject]
-                    self.val_subject = [34]
+                    self.val_subject = [35,46]
                     self.test_subject = [test_subject]
                     self.train_subjects = train_subjects
  
@@ -314,37 +236,29 @@ class Distiller(Trainer):
                     if not self.load_data():
                         continue
                     self.load_loss()
-                    self.load_optimizer()
+                    self.load_optimizer(self.model.parameters())
 
                     self.global_step = self.arg.start_epoch * len(self.data_loader['train']) / self.arg.batch_size
                     for epoch in range(self.arg.start_epoch, self.arg.num_epoch):
                         self.train(epoch)
+                        if self.early_stop.early_stop:
+                            self.early_stop = EarlyStopping(patience=15, min_delta=.0001)
+                            break
                     self.model = self.load_model(self.arg.model,self.arg.model_args)
+                    self.cross_aligner = self.load_aligner()
                     self.load_weights()
                     self.model.eval()
                     self.print_log(f' ------------ Test Subject {self.test_subject[0]} -------')
                     self.eval(epoch = 0 , loader_name='test')
                     self.print_log(f'Test accuracy for : {self.test_accuracy}')
                     self.print_log(f'Test F-Score: {self.test_f1}')
-                    # self.print_log(f'Model name: {self.arg.work_dir}')
-                    # self.print_log(f'Weight decay: {self.arg.weight_decay}')
-                    # self.print_log(f'Base LR: {self.arg.base_lr}')
-                    # self.print_log(f'Batch Size: {self.arg.batch_size}')
-                    # self.print_log(f'seed: {self.arg.seed}')
-                    # self.loss_viz(self.train_loss_summary, self.val_loss_summary)
                     self.loss_viz(self.train_loss_summary, self.val_loss_summary)
-                    subject_result = pd.Series({'test_subject' : str(self.test_subject), 'train_subjects' :str(self.train_subjects), 
-                                                'accuracy':round(self.test_accuracy,2), 'f1_score':round(self.test_f1, 2),
-                                                'precision' : round(self.test_precision, 2), 'recall': round(self.test_recall, 2), 
-                                                'auc':round(self.test_auc, 2) })
-                    results.loc[len(results)] = subject_result
+                    subject_result = pd.DataFrame([{'test_subject' : str(self.test_subject[0]), 
+                                                'accuracy':round(self.test_accuracy,2), 'f1_score':round(self.test_f1, 2), 'precision':round(self.test_precision, 2),
+                                                'recall' : round(self.test_recall,2), 'auc': round(self.test_auc, 2) }])
+                    results = pd.concat([results, subject_result], ignore_index=True)
+                results = self.add_avg_df(results)
                 results.to_csv(f'{self.arg.work_dir}/scores.csv')
-              
-            # self.model = self.load_model(self.arg.model, self.arg.model_args)
-            # self.load_loss()
-            # self.load_optimizer()
-            # self.model.load_state_dict(torch.load(self.arg.weights))
-            # val_loss = self.eval(0, loader_name='test', result_file=self.arg.result_file)
 
         
         elif self.arg.phase == 'test' :
@@ -352,6 +266,7 @@ class Distiller(Trainer):
                 raise ValueError('Please add --weights')
             y_pred, y_true, wrong_idx = self.eval(epoch=0, loader_name='test', result_file=self.arg.result_file)
             self.cm_viz(y_pred, y_true)   
+
 
 
 if __name__ == "__main__":

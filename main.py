@@ -18,6 +18,9 @@ import numpy as np
 import pandas as pd
 import torch
 
+#visualization packages 
+import matplotlib.pyplot as plt 
+import seaborn as sns 
 
 import torch.optim as optim
 from tqdm import tqdm
@@ -27,7 +30,7 @@ from sklearn.metrics import confusion_matrix, f1_score, accuracy_score, precisio
 
 #local import 
 from utils.dataset import prepare_smartfallmm, split_by_subjects
-
+from utils.callbacks import EarlyStopping
 
 def get_args():
     '''
@@ -54,7 +57,7 @@ def get_args():
     parser.add_argument('--optimizer', type = str, default = 'Adam')
     parser.add_argument('--base-lr', type = float, default = 0.001, metavar = 'LR',
                         help = 'learning rate (default: 0.001)')
-    parser.add_argument('--weight-decay', type = float , default=0.0004)
+    parser.add_argument('--weight-decay', type = float , default=0.001)
 
     #model
     parser.add_argument('--model' ,default= None, help = 'Name of Model to load')
@@ -162,7 +165,7 @@ class Trainer():
         self.norm_val = None
         self.norm_test = None
         self.data_loader = dict()
-        
+        self.early_stop = EarlyStopping(patience=15, min_delta=.001)
         #self.intertial_modality = (lambda x: next((modality for modality in x if modality != 'skeleton'), None))(arg.dataset_args['modalities'])
         self.inertial_modality = [modality  for modality in arg.dataset_args['modalities'] if modality != 'skeleton']
         self.fuse = len(self.inertial_modality) > 1 
@@ -184,6 +187,12 @@ class Trainer():
         num_params = self.count_parameters(self.model)
         self.print_log(f'# Parameters: {num_params}')
         self.print_log(f'Model size : {num_params/ (1024 ** 2):.2f} MB')
+    
+    def add_avg_df(self, results):
+        averages = results.mean(numeric_only=True, axis = 0)
+        average_row = {col: round(averages[col],2) if col in averages else 'Average' for col in results.columns}
+        results = pd.concat([results, pd.DataFrame([average_row])], ignore_index=True)
+        return results
     
     def save_config(self,src_path : str, desc_path : str) -> None: 
         '''
@@ -235,7 +244,7 @@ class Trainer():
 
         self.model.load_state_dict(torch.load(f'{self.model_path}_{self.test_subject[0]}.pth'))
     
-    def load_optimizer(self) -> None:
+    def load_optimizer(self, parameters) -> None:
         '''
         Loads Optimizers
         '''
@@ -243,19 +252,19 @@ class Trainer():
         
         if self.arg.optimizer.lower() == "adam" :
             self.optimizer = optim.Adam(
-                self.model.parameters(), 
+                parameters, 
                 lr = self.arg.base_lr,
                 # weight_decay=self.arg.weight_decay
             )
         elif self.arg.optimizer.lower() == "adamw":
             self.optimizer = optim.AdamW(
-                self.model.parameters(), 
+                parameters, 
                 lr = self.arg.base_lr, 
                 weight_decay=self.arg.weight_decay
             )
         elif self.arg.optimizer.lower() == "sgd":
             self.optimizer = optim.SGD(
-                self.model.parameters(), 
+                parameters, 
                 lr = self.arg.base_lr,
                 #weight_decay = self.arg.weight_decay
             )
@@ -379,7 +388,7 @@ class Trainer():
         plt.savefig(self.arg.work_dir + '/' + 'Confusion Matrix')
         plt.close()
     
-    def create_df(self, columns = ['test_subject', 'train_subjects', 'accuracy', 'f1_score', 'precision', 'recall', 'auc']) -> pd.DataFrame:
+    def create_df(self, columns = ['test_subject', 'accuracy', 'f1_score', 'precision', 'recall', 'auc']) -> pd.DataFrame:
         '''
         Initiats a new dataframe
         '''
@@ -416,14 +425,14 @@ class Trainer():
         return (torch.sigmoid(logits)>THRESHOLD).int().squeeze(1)
         #return torch.argmax(F.log_softmax(logits,dim =1), 1)
 
-    def cal_metrics(self, targets, preds): 
+    def cal_metrics(self, targets, predictions): 
         targets = np.array(targets)
-        preds = np.array(preds)
-        f1 = f1_score(targets, preds)
-        precision = precision_score(targets, preds)
-        recall = recall_score(targets, preds)
-        auc_score = roc_auc_score(targets, preds)
-        accuracy = accuracy_score(targets, preds)
+        predictions = np.array(predictions)
+        f1 = f1_score(targets, predictions)
+        precision = precision_score(targets, predictions)
+        recall = recall_score(targets, predictions)
+        auc_score = roc_auc_score(targets, predictions)
+        accuracy = accuracy_score(targets, predictions)
         return accuracy*100, f1*100, recall*100, precision*100, auc_score*100
 
     def train(self, epoch):
@@ -456,7 +465,7 @@ class Trainer():
             self.optimizer.zero_grad()
             logits, _= self.model(acc_data.float(), skl_data.float())
             loss = self.criterion(logits.squeeze(1), targets.float())
-            loss.mean().backward()
+            loss.backward()
             self.optimizer.step()
 
             timer['model'] += self.split_time()
@@ -485,6 +494,7 @@ class Trainer():
         self.print_log('\tTime consumption: [Data]{dataloader}, [Network]{model}'.format(**proportion))
         val_loss = self.eval(epoch, loader_name='val', result_file=self.arg.result_file)
         self.val_loss_summary.append(val_loss)
+        self.early_stop(val_loss)
 
     
     def eval(self, epoch, loader_name = 'val', result_file = None):
@@ -572,11 +582,14 @@ class Trainer():
                     if not self.load_data():
                         continue
 
-                    self.load_optimizer()
+                    self.load_optimizer(self.model.parameters())
                     self.load_loss()
                     self.global_step = self.arg.start_epoch * len(self.data_loader['train']) / self.arg.batch_size
                     for epoch in range(self.arg.start_epoch, self.arg.num_epoch):
                         self.train(epoch)
+                        if self.early_stop.early_stop:
+                            self.early_stop = EarlyStopping(min_delta=.001)
+                            break
                     self.load_model(self.arg.model,self.arg.model_args)
                     self.load_weights()
                     self.model.eval()
@@ -585,11 +598,26 @@ class Trainer():
                     self.print_log(f'Test accuracy for : {self.test_accuracy}')
                     self.print_log(f'Test F-Score: {self.test_f1}')
                     self.loss_viz(self.train_loss_summary, self.val_loss_summary)
-                    subject_result = pd.Series({'test_subject' : str(self.test_subject), 'train_subjects' :str(self.train_subjects), 
+                    subject_result = pd.DataFrame([{'test_subject' : str(self.test_subject[0]), 
                                                 'accuracy':round(self.test_accuracy,2), 'f1_score':round(self.test_f1, 2), 'precision':round(self.test_precision, 2),
-                                                'recall' : round(self.test_recall,2), 'auc': round(self.test_auc, 2) })
-                    results.loc[len(results)] = subject_result
+                                                'recall' : round(self.test_recall,2), 'auc': round(self.test_auc, 2) }])
+                    results = pd.concat([results, subject_result], ignore_index=True)
+                results = self.add_avg_df(results) 
                 results.to_csv(f'{self.arg.work_dir}/scores.csv')
+    
+    def viz_feature(self, teacher_features, student_features, epoch):
+        teacher_features = torch.flatten(teacher_features, start_dim=1)
+        student_features = torch.flatten(student_features, start_dim= 1)
+        plt.figure(figsize=(8,4))
+        for i in range(8):
+            plt.subplot(2,4,i+1)
+            sns.kdeplot(teacher_features[i, :].cpu().detach().numpy(), bw_adjust=0.5, color = 'blue', label = 'Teacher KDE')
+            
+            plt.subplot(2,4,i+1)
+            sns.kdeplot(student_features[i, :].cpu().detach().numpy(), bw_adjust=0.5, color = 'red', label = 'Student KDE')
+            plt.legend()
+            plt.savefig(f'{self.arg.work_dir}/Feature_KDE_{epoch}.png')
+        plt.close()
                     
 
 
