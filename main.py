@@ -606,13 +606,13 @@ class Trainer():
     def viz_feature(self, teacher_features, student_features, epoch):
         teacher_features = torch.flatten(teacher_features, start_dim=1)
         student_features = torch.flatten(student_features, start_dim= 1)
-        plt.figure(figsize=(8,4))
+        plt.figure(figsize=(12,6))
         for i in range(8):
             plt.subplot(2,4,i+1)
-            sns.kdeplot(teacher_features[i, :].cpu().detach().numpy(), bw_adjust=0.5, color = 'blue', label = 'Teacher KDE')
+            sns.kdeplot(teacher_features[i, :].cpu().detach().numpy(), bw_adjust=0.5, color = 'blue', label = 'T')
             
             plt.subplot(2,4,i+1)
-            sns.kdeplot(student_features[i, :].cpu().detach().numpy(), bw_adjust=0.5, color = 'red', label = 'Student KDE')
+            sns.kdeplot(student_features[i, :].cpu().detach().numpy(), bw_adjust=0.5, color = 'red', label = 'S')
             plt.legend()
             plt.savefig(f'{self.arg.work_dir}/Feature_KDE_{epoch}.png')
         plt.close()
