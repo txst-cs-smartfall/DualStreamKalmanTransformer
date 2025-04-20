@@ -6,13 +6,12 @@ class DistillationLoss(nn.Module):
     '''
     Knowledge Distillation Loss
     '''
-    def __init__(self, temperature=4, alpha=.6, pos_weigths = None):
+    def __init__(self, temperature=4.5, alpha=.5, pos_weigths = None):
         super(DistillationLoss, self).__init__()
         self.temperature = temperature
         self.alpha = alpha
         # self.criterion = nn.CrossEntropyLoss()
         self.bce = nn.BCEWithLogitsLoss(pos_weight=pos_weigths)
-        #self.bce = BinaryFocalLoss(alpha=0.75, reduction='mean')
         #self.embedding_loss = nn.CosineEmbeddingLoss()
         self.embeddin_loss = nn.KLDivLoss(reduction='batchmean')
         
