@@ -1,7 +1,7 @@
 #!/bin/bash
 teacher_weights="spTransformer"
 student_dir="exps/smartfall_fall_wokd/student/watch_acc_bwrollingnorm_not_distilled"
-work_dir="exps/smartfall_fall_kd/student/watch_acc_bwrollingnorm_distilled"
+work_dir="exps/smartfall_fall_kd/student/watch_acc_weightoncorrect_distilled"
 student_weights="ttfstudent"
 teacher_dir="$HOME/LightHART/exps/smartfall_fall_wokd/teacher/skeleton_with_experimental_90.57"
 result_file="result.txt"
@@ -37,7 +37,7 @@ result_file="result.txt"
 #python3 main.py --config ./config/smartfallmm/teacher.yaml --work-dir $teacher_dir --model-saved-name $teacher_weights  --device 2 --base-lr 1e-3 --include-val True
 
 #accelerometer only experiment
-python main.py --config ./config/smartfallmm/student.yaml --work-dir $student_dir --model-saved-name $student_weights --device 2  --include-val True
+#python main.py --config ./config/smartfallmm/student.yaml --work-dir $student_dir --model-saved-name $student_weights --device 2  --include-val True
 #python main.py --config ./config/smartfallmm/teacher.yaml --work-dir $teacher_dir --model-saved-name $teacher_weights --device 1 --base-lr 1e-3 --include-val True
 
 

@@ -6,14 +6,16 @@ class DistillationLoss(nn.Module):
     '''
     Knowledge Distillation Loss
     '''
-    def __init__(self, temperature=4.5, alpha=.5, pos_weigths = None):
+    def __init__(self, temperature=4.5, alpha=.6, pos_weigths = None):
         super(DistillationLoss, self).__init__()
         self.temperature = temperature
         self.alpha = alpha
         # self.criterion = nn.CrossEntropyLoss()
-        self.bce = nn.BCEWithLogitsLoss(pos_weight=pos_weigths)
+        #self.bce = nn.BCEWithLogitsLoss(pos_weight=pos_weigths)
+        self.bce = BinaryFocalLoss(alpha=0.6)
         #self.embedding_loss = nn.CosineEmbeddingLoss()
-        self.embeddin_loss = nn.KLDivLoss(reduction='batchmean')
+        self.embeddin_loss = nn.KLDivLoss(reduction="none")
+        self.epsilon = 1e-3
         
 
     def forward(self, student_logits, teacher_logits, labels, teacher_features, student_features, target):
@@ -39,7 +41,14 @@ class DistillationLoss(nn.Module):
             ## kldiv between teacher and student features#####
             soft_teacher = nn.functional.softmax(teacher_features/self.temperature, dim=-1)
             soft_prob = nn.functional.log_softmax(student_features/self.temperature, dim=-1)
-            cosine_loss = self.embeddin_loss(soft_prob,soft_teacher)
+
+            ## comparing only correct knowledge ## 
+            teacher_pred = (torch.sigmoid(teacher_logits) > 0.5).int().squeeze(1)
+            correct_mask = (teacher_pred ==labels).float()
+            weights =(1.0 /1.5) * correct_mask + (.5/1.5)* (1 - correct_mask)
+            # weights = weights.view(-1, 1, 1)
+            cosine_loss = (weights.view(-1, 1,1) * self.embeddin_loss(soft_prob,soft_teacher)).mean()
+            #print(cosine_loss)
             # Calculate the true label loss for multiclass
             #label_loss = self.criterion(student_logits, labels)
             ### for feature based#####
