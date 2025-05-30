@@ -1,9 +1,25 @@
 #!/bin/bash
+
+student_file="./config/smartfallmm/student.yaml"
+teacher_file="./config/smartfallmm/teacher.yaml"
+distill_file="./config/smartfallmm/distill.yaml"
+if [ -f "$student_file" ]; then
+    echo "Reading YAML config: $student_file"
+    python3 -c "import yaml,sys; print(yaml.safe_load(open(sys.argv[1])))" "$student_file"
+
+    sensor_value=$(python3 -c "import yaml,sys; print(yaml.safe_load(open(sys.argv[1])).get('dataset_args', {}).get('sensors', '')[0])" "$student_file")
+    echo "Sensor value: $sensor_value"
+else
+    echo "Config file not found: $student_file"
+fi
+# save the selected sensor variable from the yaml file to a variable 
+
 teacher_weights="spTransformer"
-student_dir="exps/smartfall_fall_wokd/student/watch_acc_bwrollingnorm_not_distilled"
-work_dir="exps/smartfall_fall_kd/student/watch_acc_weightoncorrect_distilled"
+student_dir="exps/smartfall_fall_wokd/student/${sensor_value}_acc_again_cutoff_5.5"
+work_dir="exps/smartfall_fall_kd/student/${sensor_value}_acc_again_alpha_.7_temperature_2.5"
 student_weights="ttfstudent"
-teacher_dir="$HOME/LightHART/exps/smartfall_fall_wokd/teacher/skeleton_with_experimental_90.57"
+
+teacher_dir="$HOME/LightHART/exps/smartfall_fall_wokd/teacher/skeleton_with_experimental_meta_hip_again"
 result_file="result.txt"
 # weights="berkley_best.pt"
 # work_dir="exps/bmhad_woKD/late_fusion_epoch150_alldrop0.4"

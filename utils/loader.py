@@ -393,9 +393,9 @@ class DatasetBuilder:
                         executed  = True
                         unimodal_data = self.load_file(file_path)
                         trial_data[modality] = unimodal_data
-                        if modality == 'accelerometer':
-                            unimodal_data = butterworth_filter(unimodal_data, cutoff=7.5, fs=25)
-                        if modality == 'accelerometer' and unimodal_data.shape[0]>250:
+                        if modality in ['accelerometer' , 'gyroscope']:
+                            unimodal_data = butterworth_filter(unimodal_data, cutoff=5.5, fs=25)
+                        if modality in ['accelerometer', 'gyroscope'] and unimodal_data.shape[0]>250:
                             trial_data[modality] = self.select_subwindow_pandas(unimodal_data)                            
                         # if modality == 'skeleton':
                         #     print(unimodal_data.shape)
