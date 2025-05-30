@@ -96,7 +96,7 @@ class UTD_mm(torch.utils.data.Dataset):
     def __init__(self, dataset, batch_size):
         self.inertial_modality = next((modality for modality in dataset if modality in ['accelerometer', 'gyroscope']), None)
         #self.acc_data = dataset[self.inertial_modality]
-        self.acc_data = dataset['accelerometer']
+        self.acc_data = dataset[self.inertial_modality]
         self.labels = dataset['labels']
         self.skl_data = dataset['skeleton']
         #self.skl_data = np.random.randn(self.acc_data.shape[0], 32,3)
@@ -196,7 +196,7 @@ class UTD_mm(torch.utils.data.Dataset):
         acc_data = torch.cat(( watch_smv,acc_data), dim = -1)
         #data[self.inertial_modality] = acc_data
 
-        data['accelerometer'] = acc_data
+        data[self.inertial_modality] = acc_data
         data['skeleton'] = skl_data
         label = self.labels[index]
         label = torch.tensor(label)

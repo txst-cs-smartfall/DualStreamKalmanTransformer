@@ -7,6 +7,8 @@ class DistillationLoss(nn.Module):
     Knowledge Distillation Loss
     '''
     def __init__(self, temperature=4.5, alpha=.6, pos_weigths = None):
+        # .4 for phone gyroscope
+        # .6 for watch accelerometer
         super(DistillationLoss, self).__init__()
         self.temperature = temperature
         self.alpha = alpha

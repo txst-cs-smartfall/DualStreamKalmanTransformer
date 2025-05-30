@@ -395,29 +395,22 @@ class Trainer():
     
     def wrong_pred_viz(self, wrong_idx: torch.Tensor):
         '''
-        Visualizes and stores the wrong predicitons
-
+        Visualizes the wrong predictions
         '''
+        wrong_acc_data = []
+        for i in range(len(label_list)):
+            if label_list[i] == 1 and pred_list[i] == 1:
+                wrong_acc_data.append(acc_data[i])
 
-        wrong_label = self.test_data['labels'][wrong_idx]
-        wrong_label = wrong_label
-        labels, mis_count = np.unique(wrong_label, return_counts =True)
-        wrong_idx = np.array(wrong_idx)
-        plt.figure(figsize=(10,10))
-        for i in labels:
-            act_idx = wrong_idx[np.where(wrong_label == i)[0]]
-            count = 0
-            for j in range(5):
-                count += 1
-                # plt.subplot(i+1,j+1, count)
-                plt.xticks([])
-                plt.yticks([])
-                plt.grid(False)
-                trial_data = self.test_data['acc_data'][act_idx[j]]
-                plt.plot(trial_data)
-                plt.xlabel(i)     
-                plt.savefig(self.arg.work_dir + '/' +'wrong_predictions'+'/'+ 'Wrong_Pred' +str(i)+str(j))
-                plt.close()
+        plt.figure(figsize=(24,16))
+        for i in range(min(16, len(wrong_acc_data))):
+            plt.subplot(4,4,i+1)
+            plt.plot(acc_data[i])
+            plt.title(f'Right Prediction {i+1}')
+            plt.xlabel('Time')
+            plt.ylabel('Acceleration')
+        plt.savefig(f'{self.arg.work_dir}/Wrong_Predictions.png')
+        plt.close()
 
     def cal_prediction(self, logits):
         return (torch.sigmoid(logits)>THRESHOLD).int().squeeze(1)
@@ -453,7 +446,7 @@ class Trainer():
 
         for batch_idx, (inputs, targets, idx) in enumerate(process):
             with torch.no_grad():
-                acc_data = inputs['accelerometer'].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
+                acc_data = inputs[self.inertial_modality[0]].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
                 skl_data = inputs['skeleton'].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
                 targets = targets.to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
 
@@ -516,7 +509,7 @@ class Trainer():
         process = tqdm(self.data_loader[loader_name], ncols=80)
         with torch.no_grad():
             for batch_idx, (inputs, targets, idx) in enumerate(process):
-                acc_data = inputs['accelerometer'].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
+                acc_data = inputs[self.inertial_modality[0]].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
                 skl_data = inputs['skeleton'].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
                 targets = targets.to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
 

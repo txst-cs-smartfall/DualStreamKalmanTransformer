@@ -165,7 +165,7 @@ class Distiller(Trainer):
         for batch_idx, (inputs, targets, idx) in enumerate(process):
 
             with torch.no_grad():
-                acc_data = inputs['accelerometer'].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
+                acc_data = inputs[self.inertial_modality[0]].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
                 skl_data = inputs['skeleton'].to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
                 targets = targets.to(f'cuda:{self.output_device}' if use_cuda else 'cpu')
             timer['dataloader'] += self.split_time()
