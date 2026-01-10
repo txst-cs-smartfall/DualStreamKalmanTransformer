@@ -171,18 +171,14 @@ def device_type(v):
     
 def init_seed(seed):
     '''
-    Initial seed for reproducabilty of the resutls
+    Initial seed for reproducabilty of the results
     '''
     torch.cuda.manual_seed_all(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-    # torch.backends.cudnn.enabled = True
-    # training speed is too slow if set to True
+    # Original settings (faster, slight variance between runs)
     torch.backends.cudnn.deterministic = False
-
-    # on cuda 11 cudnn8, the default algorithm is very slow
-    # unlike on cuda 10, the default works well
     torch.backends.cudnn.benchmark = True
 
 def import_class(import_str):
