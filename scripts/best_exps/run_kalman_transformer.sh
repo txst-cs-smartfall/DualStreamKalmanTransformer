@@ -4,6 +4,11 @@
 
 set -e
 
+# Limit CPU cores
+export OMP_NUM_THREADS=8
+export MKL_NUM_THREADS=8
+export NUMEXPR_NUM_THREADS=8
+
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 WORK_DIR="results/kalman_transformer_${TIMESTAMP}"
 CONFIG="config/smartfallmm/reproduce_91.yaml"
