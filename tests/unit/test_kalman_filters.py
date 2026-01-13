@@ -198,8 +198,15 @@ class TestFilterFactory:
 
     def test_create_ukf(self):
         from utils.kalman.ukf import UnscentedKalmanFilter
+        try:
+            from utils.kalman.ukf_fast import UnscentedKalmanFilterFast
+            valid_types = (UnscentedKalmanFilter, UnscentedKalmanFilterFast)
+        except ImportError:
+            valid_types = (UnscentedKalmanFilter,)
         ukf = create_filter('ukf')
-        assert isinstance(ukf, UnscentedKalmanFilter)
+        assert isinstance(ukf, valid_types), (
+            f"Expected UnscentedKalmanFilter or UnscentedKalmanFilterFast, got {type(ukf).__name__}"
+        )
 
     def test_invalid_type(self):
         with pytest.raises((ValueError, KeyError)):
