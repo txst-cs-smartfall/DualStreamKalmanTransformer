@@ -185,19 +185,19 @@ def print_fold_results_table(results: List[Dict]) -> None:
     successful = sorted(successful, key=lambda x: x.get('fold_idx', 0))
 
     # Table header
-    print("\n" + "=" * 120)
+    print("\n" + "=" * 150)
     print("PER-FOLD RESULTS TABLE")
-    print("=" * 120)
+    print("=" * 150)
 
     # Column headers
     header = (
         f"{'Fold':>4} | {'Subject':>7} | {'GPU':>3} | "
         f"{'Val F1':>7} {'Val P':>6} {'Val R':>6} | "
         f"{'Test F1':>7} {'Test P':>6} {'Test R':>6} {'Test Acc':>8} | "
-        f"{'Epoch':>5} | {'Time':>6}"
+        f"{'Epoch':>5} | {'Windows':>15} | {'Trials':>12} | {'Time':>6}"
     )
     print(header)
-    print("-" * 120)
+    print("-" * 150)
 
     # Collect metrics for statistics
     val_f1s, test_f1s, test_accs = [], [], []
@@ -210,6 +210,12 @@ def print_fold_results_table(results: List[Dict]) -> None:
         gpu_id = r.get('gpu_id', 0)
         best_epoch = r.get('best_epoch', 0)
         elapsed_min = r.get('elapsed_time', 0) / 60
+
+        # Dataset stats
+        fall_win = r.get('fall_windows', 0)
+        adl_win = r.get('adl_windows', 0)
+        fall_tri = r.get('fall_trials', 0)
+        adl_tri = r.get('adl_trials', 0)
 
         # Validation metrics
         val = r.get('val', {})
@@ -234,23 +240,25 @@ def print_fold_results_table(results: List[Dict]) -> None:
         test_accs.append(test_acc)
 
         # Format row
+        win_str = f"{fall_win}:{adl_win}"
+        tri_str = f"{fall_tri}:{adl_tri}"
         row = (
             f"{fold_idx:>4} | {test_subject:>7} | {gpu_id:>3} | "
             f"{val_f1:>6.2f}% {val_prec:>5.2f}% {val_rec:>5.2f}% | "
             f"{test_f1:>6.2f}% {test_prec:>5.2f}% {test_rec:>5.2f}% {test_acc:>7.2f}% | "
-            f"{best_epoch:>5} | {elapsed_min:>5.1f}m"
+            f"{best_epoch:>5} | {win_str:>15} | {tri_str:>12} | {elapsed_min:>5.1f}m"
         )
         print(row)
 
     # Statistics row
-    print("-" * 120)
+    print("-" * 150)
 
     # Mean row
     mean_row = (
         f"{'MEAN':>4} | {'':>7} | {'':>3} | "
         f"{np.mean(val_f1s):>6.2f}% {np.mean(val_precs):>5.2f}% {np.mean(val_recs):>5.2f}% | "
         f"{np.mean(test_f1s):>6.2f}% {np.mean(test_precs):>5.2f}% {np.mean(test_recs):>5.2f}% {np.mean(test_accs):>7.2f}% | "
-        f"{'':>5} | {'':>6}"
+        f"{'':>5} | {'':>15} | {'':>12} | {'':>6}"
     )
     print(mean_row)
 
@@ -259,7 +267,7 @@ def print_fold_results_table(results: List[Dict]) -> None:
         f"{'STD':>4} | {'':>7} | {'':>3} | "
         f"{np.std(val_f1s):>6.2f}  {np.std(val_precs):>5.2f}  {np.std(val_recs):>5.2f}  | "
         f"{np.std(test_f1s):>6.2f}  {np.std(test_precs):>5.2f}  {np.std(test_recs):>5.2f}  {np.std(test_accs):>7.2f}  | "
-        f"{'':>5} | {'':>6}"
+        f"{'':>5} | {'':>15} | {'':>12} | {'':>6}"
     )
     print(std_row)
 
@@ -268,7 +276,7 @@ def print_fold_results_table(results: List[Dict]) -> None:
         f"{'MIN':>4} | {'':>7} | {'':>3} | "
         f"{np.min(val_f1s):>6.2f}% {'':>5} {'':>5} | "
         f"{np.min(test_f1s):>6.2f}% {'':>5} {'':>5} {np.min(test_accs):>7.2f}% | "
-        f"{'':>5} | {'':>6}"
+        f"{'':>5} | {'':>15} | {'':>12} | {'':>6}"
     )
     print(min_row)
 
@@ -276,11 +284,11 @@ def print_fold_results_table(results: List[Dict]) -> None:
         f"{'MAX':>4} | {'':>7} | {'':>3} | "
         f"{np.max(val_f1s):>6.2f}% {'':>5} {'':>5} | "
         f"{np.max(test_f1s):>6.2f}% {'':>5} {'':>5} {np.max(test_accs):>7.2f}% | "
-        f"{'':>5} | {'':>6}"
+        f"{'':>5} | {'':>15} | {'':>12} | {'':>6}"
     )
     print(max_row)
 
-    print("=" * 120)
+    print("=" * 150)
 
     # Best and worst folds
     if test_f1s:
@@ -581,6 +589,10 @@ def train_single_fold(
             'val': val_metrics,
             'test': test_metrics,
             'best_epoch': getattr(trainer, 'best_epoch', 0),
+            'fall_windows': getattr(trainer, 'fold_fall_windows', 0),
+            'adl_windows': getattr(trainer, 'fold_adl_windows', 0),
+            'fall_trials': getattr(trainer, 'fold_fall_trials', 0),
+            'adl_trials': getattr(trainer, 'fold_adl_trials', 0),
             'status': 'success',
             'elapsed_time': elapsed_time,
         }
@@ -777,6 +789,11 @@ class RayDistributedTrainer:
         config_path: str,
         num_gpus: int = 3,
         work_dir: Optional[str] = None,
+        model_override: Optional[str] = None,
+        model_args_override: Optional[str] = None,
+        loss_type_override: Optional[str] = None,
+        embed_dim_override: Optional[int] = None,
+        adl_stride_override: Optional[int] = None,
         enable_wandb: bool = False,
         wandb_project: str = 'smartfall-mm',
         wandb_entity: str = 'abheek-texas-state-university',
@@ -791,6 +808,11 @@ class RayDistributedTrainer:
             config_path: Path to YAML config file
             num_gpus: Number of GPUs to use
             work_dir: Output directory
+            model_override: Override model class (e.g., 'Models.encoder_ablation.KalmanConv1dLinear')
+            model_args_override: Override model args as dict string
+            loss_type_override: Override loss function (bce, focal, cb_focal)
+            embed_dim_override: Override embedding dimension
+            adl_stride_override: Override ADL stride
             enable_wandb: Whether to enable W&B logging
             wandb_project: W&B project name
             wandb_entity: W&B entity
@@ -810,6 +832,36 @@ class RayDistributedTrainer:
         # Load config
         self.config = self._load_config()
         self.config['seed'] = seed
+
+        # Apply model override (for ablation studies)
+        if model_override:
+            self.config['model'] = model_override
+
+        if model_args_override:
+            import ast
+            try:
+                override_args = ast.literal_eval(model_args_override)
+                existing_args = self.config.get('model_args', {})
+                existing_args.update(override_args)
+                self.config['model_args'] = existing_args
+            except (ValueError, SyntaxError) as e:
+                print(f"WARNING: Failed to parse --model-args: {e}")
+
+        # Apply loss type override
+        if loss_type_override:
+            self.config['loss_type'] = loss_type_override
+
+        # Apply embed_dim override
+        if embed_dim_override:
+            model_args = self.config.get('model_args', {})
+            model_args['embed_dim'] = embed_dim_override
+            self.config['model_args'] = model_args
+
+        # Apply adl_stride override
+        if adl_stride_override:
+            dataset_args = self.config.get('dataset_args', {})
+            dataset_args['adl_stride'] = adl_stride_override
+            self.config['dataset_args'] = dataset_args
 
         # Compute test candidates
         self.test_candidates = self._compute_test_candidates()
