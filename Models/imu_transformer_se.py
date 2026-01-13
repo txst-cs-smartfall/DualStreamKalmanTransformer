@@ -57,7 +57,7 @@ class TemporalAttentionPooling(nn.Module):
             nn.Linear(embed_dim // 2, 1, bias=False)
         )
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor):
         """Compute attention-weighted pooling. x: (B, T, C)"""
         scores = self.attention(x).squeeze(-1)  # (B, T)
         weights = F.softmax(scores, dim=1)  # (B, T)
