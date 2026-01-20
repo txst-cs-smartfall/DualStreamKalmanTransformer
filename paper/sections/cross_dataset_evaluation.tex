@@ -35,7 +35,7 @@ LOSO Folds & 22 & 15 & 12 \\
 Table~\ref{tab:cross_dataset_results} presents comprehensive results across all three datasets, comparing Kalman-fused and raw input configurations.
 
 \begin{table}[H]
-\caption{Cross-dataset evaluation results. All metrics reported as mean $\pm$ std across LOSO folds. Best results per dataset in \textbf{bold}.}
+\caption{Cross-dataset evaluation results. All metrics reported as mean $\pm$ std across LOSO folds. Best results per dataset in \textbf{bold}. All models use dual-stream Kalman transformer architecture.}
 \label{tab:cross_dataset_results}
 \centering
 \small
@@ -46,8 +46,8 @@ Table~\ref{tab:cross_dataset_results} presents comprehensive results across all 
 SmartFallMM & Kalman & \textbf{91.38 $\pm$ 6.67} & \textbf{88.44} & 89.22 & \textbf{94.14} & \textbf{94.30} & 22 \\
 \midrule
 \multirow{2}{*}{UP-FALL}
- & Kalman & \textbf{95.14 $\pm$ 3.35} & \textbf{96.40 $\pm$ 2.57} & 94.08 $\pm$ 6.06 & \textbf{96.58 $\pm$ 3.79} & \textbf{99.14 $\pm$ 0.88} & 15 \\
- & Raw & 94.77 $\pm$ 3.29 & 96.26 $\pm$ 2.38 & \textbf{94.78 $\pm$ 5.12} & 95.06 $\pm$ 4.69 & 99.06 $\pm$ 1.05 & 15 \\
+ & Kalman & \textbf{94.90 $\pm$ 3.72} & \textbf{96.21} & 93.44 & \textbf{96.09} & \textbf{98.87} & 15 \\
+ & Raw & 94.17 $\pm$ 4.42 & 95.90 & \textbf{94.73} & 94.02 & 98.81 & 15 \\
 \midrule
 \multirow{2}{*}{WEDA-FALL}
  & Kalman & \textbf{94.40 $\pm$ 3.21} & \textbf{92.85 $\pm$ 4.12} & \textbf{92.18 $\pm$ 4.85} & 96.89 $\pm$ 3.25 & \textbf{97.62 $\pm$ 2.84} & 12 \\
@@ -56,7 +56,40 @@ SmartFallMM & Kalman & \textbf{91.38 $\pm$ 6.67} & \textbf{88.44} & 89.22 & \tex
 \end{tabular}
 \end{table}
 
-Kalman fusion improves test F1 on both external datasets: +0.37\% on UP-FALL and +3.97\% on WEDA-FALL. The substantially larger improvement on WEDA-FALL aligns with expectations---consumer-grade Fitbit sensors exhibit higher noise levels where Kalman filtering provides greater benefit, and the optimal 5-second window captures more complete fall dynamics.
+Kalman fusion improves test F1 on both external datasets: +0.73\% on UP-FALL and +3.97\% on WEDA-FALL. The substantially larger improvement on WEDA-FALL aligns with expectations---consumer-grade Fitbit sensors exhibit higher noise levels where Kalman filtering provides greater benefit.
+
+Table~\ref{tab:best_configs} presents the optimal configuration for each dataset with complete hyperparameters.
+
+\begin{table}[H]
+\caption{Best model configurations per dataset. All models use dual-stream architecture with Kalman-fused input (7 channels: SMV, acc, orientation).}
+\label{tab:best_configs}
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Parameter} & \textbf{SmartFallMM} & \textbf{UP-FALL} & \textbf{WEDA-FALL} \\
+\midrule
+\multicolumn{4}{l}{\textit{Best Results:}} \\
+Test F1 & 91.38\% $\pm$ 6.67 & 94.90\% $\pm$ 3.72 & 94.40\% $\pm$ 3.21 \\
+Accuracy & 88.44\% & 96.21\% & 92.85\% \\
+Precision & 89.22\% & 93.44\% & 92.18\% \\
+Recall & 94.14\% & 96.09\% & 96.89\% \\
+AUC & 94.30\% & 98.87\% & 97.62\% \\
+\midrule
+\multicolumn{4}{l}{\textit{Model Configuration:}} \\
+Model & KalmanConv1dLinear & KalmanConv1dConv1d & KalmanConv1dConv1d \\
+Window (samples) & 128 & 160 & 250 \\
+Window (seconds) & 4.3s & 8.9s & 5.0s \\
+Embed Dim & 48 & 64 & 48 \\
+Acc Ratio & 65\% & 65\% & 65\% \\
+Dropout & 0.5 & 0.5 & 0.5 \\
+\midrule
+\multicolumn{4}{l}{\textit{Dataset Info:}} \\
+Sampling Rate & 30 Hz & 18 Hz & 50 Hz \\
+LOSO Folds & 22 & 15 & 12 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 %-------------------------------------------------------------------
 % TRAIN/VAL/TEST SPLIT ANALYSIS
@@ -128,7 +161,7 @@ Table~\ref{tab:kalman_benefit_sensor} directly compares the benefit of Kalman fu
 \toprule
 \textbf{Dataset} & \textbf{Sensor Type} & \textbf{Kalman F1} & \textbf{Raw F1} & \textbf{$\Delta$F1} \\
 \midrule
-UP-FALL & Research-grade IMU & 95.11\% & 94.77\% & +0.34\% \\
+UP-FALL & Research-grade IMU & 94.90\% & 94.17\% & +0.73\% \\
 WEDA-FALL & Consumer Fitbit & 94.40\% & 90.43\% & \textbf{+3.97\%} \\
 \bottomrule
 \end{tabular}
@@ -145,9 +178,9 @@ The 10$\times$ larger improvement on WEDA-FALL confirms that Kalman filtering pr
 Cross-dataset evaluation validates three claims:
 
 \begin{enumerate}
-    \item \textbf{Generalization}: The dual-stream Kalman architecture achieves $>$91\% F1 across all three datasets with different sensor types and sampling rates, reaching 94.40\% on WEDA-FALL.
+    \item \textbf{Generalization}: The dual-stream Kalman architecture achieves $>$91\% F1 across all three datasets with different sensor types and sampling rates: SmartFallMM (91.38\%), UP-FALL (94.90\%), and WEDA-FALL (94.40\%).
 
-    \item \textbf{Kalman benefit scales with noise}: Improvement from Kalman fusion is +0.37\% on research-grade UP-FALL but +3.97\% on consumer-grade WEDA-FALL, confirming greater benefit on noisier sensors.
+    \item \textbf{Kalman benefit scales with noise}: Improvement from Kalman fusion is +0.73\% on research-grade UP-FALL but +3.97\% on consumer-grade WEDA-FALL, confirming greater benefit on noisier sensors (5$\times$ larger improvement).
 
-    \item \textbf{Hyperparameter adaptation required}: Window size and Kalman noise parameters must be tuned per dataset---UP-FALL requires 8.9s windows, while WEDA-FALL benefits from 5.0s windows to capture complete fall dynamics at 50Hz.
+    \item \textbf{Hyperparameter adaptation required}: Window size and Kalman noise parameters must be tuned per dataset---UP-FALL requires 8.9s windows (160 samples at 18Hz), while WEDA-FALL benefits from 5.0s windows (250 samples at 50Hz) to capture complete fall dynamics.
 \end{enumerate}

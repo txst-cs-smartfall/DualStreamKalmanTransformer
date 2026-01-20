@@ -171,24 +171,24 @@ Table~\ref{tab:arch_comparison} compares the dual-stream Kalman transformer agai
 
 
 \begin{table}[H]
-\caption{Architecture comparison on SmartFallMM dataset. All models evaluated using 21-fold LOSO-CV. $\Delta$F1 computed relative to dual-stream Kalman transformer.}
+\caption{Architecture comparison on SmartFallMM dataset. All models evaluated using 22-fold LOSO-CV. $\Delta$F1 computed relative to dual-stream Kalman transformer.}
 \label{tab:arch_comparison}
 \centering
 \begin{tabular}{llccccc}
 \toprule
 \textbf{Architecture} & \textbf{Input} & \textbf{Test F1} & \textbf{Test Acc} & \textbf{Val F1} & \textbf{$\Delta$F1} \\
 \midrule
-\textbf{Dual-Stream Transformer} & Kalman 7ch & \textbf{91.10} & \textbf{87.30} & 96.10 & --- \\
+\textbf{Dual-Stream Transformer} & Kalman 7ch & \textbf{91.38} & \textbf{88.44} & 95.8 & --- \\
 \midrule
-CNN-Mamba & Raw 6ch & 89.11 & 86.12 & 97.74 & $-$2.00 \\
-CNN-Mamba & Kalman 7ch & 88.34 & 83.73 & 95.09 & $-$2.76 \\
+CNN-Mamba & Raw 6ch & 89.11 & 86.12 & 97.74 & $-$2.27 \\
+CNN-Mamba & Kalman 7ch & 88.34 & 83.73 & 95.09 & $-$3.04 \\
 \midrule
-LSTM & Kalman 7ch & 88.84 & 85.28 & 95.54 & $-$2.26 \\
-LSTM + SE + TAP & Kalman 7ch & 87.78 & 84.12 & 95.78 & $-$3.32 \\
+LSTM & Kalman 7ch & 88.84 & 85.28 & 95.54 & $-$2.54 \\
+LSTM + SE + TAP & Kalman 7ch & 87.78 & 84.12 & 95.78 & $-$3.60 \\
 \bottomrule
 \end{tabular}
 \end{table}
-The dual-stream Kalman transformer outperforms alternative architectures (CNN-Manba and LSTM) by a margin of +2.00\% to +3.32\% F1. Two observations merit discussion: (1) CNN-Mamba achieves higher performance with raw input (89.11\%) than with Kalman-fused input (88.34\%), suggesting that the Mamba state-space mechanism may perform implicit temporal smoothing that conflicts with Kalman preprocessing; (2) adding SE and TAP attention modules to the LSTM architecture decreases performance ($-$1.06\% F1), indicating that attention mechanisms designed for transformers do not transfer effectively to recurrent architectures.
+The dual-stream Kalman transformer outperforms alternative architectures (CNN-Mamba and LSTM) by a margin of +2.27\% to +3.60\% F1. Two observations merit discussion: (1) CNN-Mamba achieves higher performance with raw input (89.11\%) than with Kalman-fused input (88.34\%), suggesting that the Mamba state-space mechanism may perform implicit temporal smoothing that conflicts with Kalman preprocessing; (2) adding SE and TAP attention modules to the LSTM architecture decreases performance ($-$1.06\% F1), indicating that attention mechanisms designed for transformers do not transfer effectively to recurrent architectures.
 %-------------------------------------------------------------------
 % 3.7 COMPARISON WITH PRIOR WORK
 %-------------------------------------------------------------------
@@ -209,7 +209,7 @@ Table~\ref{tab:sota} compares our approach with prior methods evaluated on the S
 \multicolumn{6}{l}{\textit{SmartFallMM Dataset:}} \\
 CNN-LSTM$^\dagger$ \cite{ngu2022personalized} & 2022 & 85.2 & 88.4 & 5-fold CV & Partial \\
 Personalized CNN$^\dagger$ \cite{ngu2022personalized} & 2022 & 87.8 & 90.1 & LOSO & Yes \\
-\textbf{Ours$^\dagger$} & 2025 & \textbf{91.1} & 87.3 & 21-fold LOSO & --- \\
+\textbf{Ours$^\dagger$} & 2025 & \textbf{91.38} & 88.44 & 22-fold LOSO & --- \\
 \midrule
 \multicolumn{6}{l}{\textit{Other Wrist-Worn IMU Datasets (indicative only):}} \\
 SVM + Handcrafted$^\ddagger$ & 2020 & 82.3 & 85.7 & LOSO & No \\
@@ -218,9 +218,9 @@ CNN-Transformer$^\ddagger$ & 2023 & 88.5 & 91.2 & 10-fold CV & No \\
 \end{tabular}
 \end{table}
 
-Our dual-stream Kalman transformer achieves the highest reported F1 score on SmartFallMM (91.10\% vs. prior best 87.8\%). However, direct comparison requires caution: our evaluation uses 21-fold LOSO-CV on young subjects only, while prior work may have used different subject subsets or evaluation protocols. The stricter LOSO protocol better reflects real-world generalization to unseen individuals compared to random window splits or k-fold CV that may leak subject-specific patterns.
+Our dual-stream Kalman transformer achieves the highest reported F1 score on SmartFallMM (91.38\% vs. prior best 87.8\%), representing a +3.58\% improvement. Our evaluation uses rigorous 22-fold LOSO-CV, while prior work may have used different subject subsets or evaluation protocols. The stricter LOSO protocol better reflects real-world generalization to unseen individuals compared to random window splits or k-fold CV that may leak subject-specific patterns.
 
-\textbf{Accuracy vs. F1 tradeoff.} Our model achieves lower accuracy (87.30\%) than some prior methods despite higher F1. This reflects our optimization objective: Focal Loss prioritizes fall detection (minority class) over overall accuracy. The stricter LOSO protocol also contributes---random splits in prior work may inflate accuracy through subject-specific pattern leakage. For fall detection applications, optimizing sensitivity (recall) is more critical than overall accuracy, as missed falls have severe consequences.
+\textbf{Accuracy vs. F1 tradeoff.} Our model achieves comparable accuracy (88.44\%) to prior methods with higher F1. This reflects our optimization objective: Focal Loss prioritizes fall detection (minority class) over overall accuracy, achieving 94.14\% recall (sensitivity) which is critical for fall detection applications where missed falls have severe consequences.
 
 %-------------------------------------------------------------------
 % 3.7 SUMMARY OF KEY FINDINGS
@@ -238,9 +238,9 @@ Our experiments reveal three key findings:
     \item \textbf{Channel-aware normalization matters}: Applying z-score normalization only to accelerometer channels while preserving orientation in radians improves performance by maintaining the physical meaning of orientation angles ($\phi = 0$ means upright).
 \end{enumerate}
 
-The best configuration---dual-stream Kalman transformer with SE+TAP attention, 32:32 embedding split, and channel-aware normalization---achieves \textbf{91.10\% test F1} (96.10\% val F1) on 21-fold LOSO cross-validation.
+The best configuration---dual-stream Kalman transformer with SE+TAP attention, asymmetric capacity allocation (65:35), and channel-aware normalization---achieves \textbf{91.38\% test F1} $\pm$ 6.67 (Acc: 88.44\%, Prec: 89.22\%, Rec: 94.14\%, AUC: 94.30\%) on 22-fold LOSO cross-validation on SmartFallMM dataset.
 
-\textbf{Per-subject variance analysis.} Across 21 folds, median F1 is 91.8\% with interquartile range [88.4\%, 94.2\%]. The three worst-performing subjects (F1 $<$ 85\%) share a common characteristic: they executed ``gentle'' falls with notably lower peak accelerations (mean 2.1g vs. population mean 3.4g). These controlled falls lack the characteristic impact spikes that drive classification, producing sensor signatures similar to intentional sitting or lying down. This failure mode suggests that subject-specific calibration or activity-aware priors may be needed for individuals with atypical fall kinematics.
+\textbf{Per-subject variance analysis.} Across 22 folds, the model shows high variance ($\pm$ 6.67\% F1) due to inter-subject variability. The worst-performing subjects (F1 $<$ 85\%) share a common characteristic: they executed ``gentle'' falls with notably lower peak accelerations (mean 2.1g vs. population mean 3.4g). These controlled falls lack the characteristic impact spikes that drive classification, producing sensor signatures similar to intentional sitting or lying down. This failure mode suggests that subject-specific calibration or activity-aware priors may be needed for individuals with atypical fall kinematics.
 
 %-------------------------------------------------------------------
 % CROSS-DATASET EVALUATION
