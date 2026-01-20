@@ -113,6 +113,30 @@ WEDA-FALL & 0.012 & 0.132 & 0.240 & 0.282 \\
 WEDA-FALL requires the highest measurement noise parameters ($R_{\text{acc}}$, $R_{\text{gyro}}$), confirming that consumer-grade Fitbit sensors produce noisier signals than research-grade IMUs or Android smartwatches.
 
 %-------------------------------------------------------------------
+% KALMAN BENEFIT ANALYSIS
+%-------------------------------------------------------------------
+\subsection{Kalman Fusion Benefit by Sensor Quality}
+\label{subsec:kalman_benefit}
+
+Table~\ref{tab:kalman_benefit_sensor} directly compares the benefit of Kalman fusion across sensor quality levels.
+
+\begin{table}[H]
+\caption{Kalman fusion benefit scales inversely with sensor quality. Consumer-grade sensors benefit substantially more from noise filtering.}
+\label{tab:kalman_benefit_sensor}
+\centering
+\begin{tabular}{llccc}
+\toprule
+\textbf{Dataset} & \textbf{Sensor Type} & \textbf{Kalman F1} & \textbf{Raw F1} & \textbf{$\Delta$F1} \\
+\midrule
+UP-FALL & Research-grade IMU & 95.11\% & 94.77\% & +0.34\% \\
+WEDA-FALL & Consumer Fitbit & 94.40\% & 90.43\% & \textbf{+3.97\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 10$\times$ larger improvement on WEDA-FALL confirms that Kalman filtering provides greatest value when input signals are degraded by sensor noise characteristic of consumer-grade wearables.
+
+%-------------------------------------------------------------------
 % KEY FINDINGS
 %-------------------------------------------------------------------
 \subsection{Cross-Dataset Summary}
