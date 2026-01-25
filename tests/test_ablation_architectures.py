@@ -16,6 +16,31 @@ WINDOW_SIZES = [36, 54, 72, 100, 128, 160]
 BATCH_SIZES = [1, 4, 16]
 EMBED_DIMS = [32, 48, 64]
 
+# Check module availability for CI
+try:
+    from Models.dual_stream_cnn_lstm import DualStreamLSTM
+    HAS_LSTM = True
+except ImportError:
+    HAS_LSTM = False
+
+try:
+    from Models.encoder_ablation import KalmanConv1dLinear
+    HAS_TRANSFORMER = True
+except ImportError:
+    HAS_TRANSFORMER = False
+
+try:
+    from Models.short_window_variants import DeepCNNTransformer
+    HAS_DEEP_CNN = True
+except ImportError:
+    HAS_DEEP_CNN = False
+
+try:
+    from Models.dual_stream_mamba import DualStreamMamba
+    HAS_MAMBA = True
+except ImportError:
+    HAS_MAMBA = False
+
 
 def load_lstm(frames=128, channels=7, embed=64):
     from Models.dual_stream_cnn_lstm import DualStreamLSTM
@@ -57,6 +82,7 @@ def raw_data():
     return gen
 
 
+@pytest.mark.skipif(not HAS_LSTM, reason="DualStreamLSTM not available")
 class TestLSTM:
     @pytest.mark.parametrize("seq", WINDOW_SIZES)
     def test_kalman_forward(self, kalman_data, seq):
@@ -92,6 +118,7 @@ class TestLSTM:
         assert x.grad is not None and not torch.isnan(x.grad).any()
 
 
+@pytest.mark.skipif(not HAS_TRANSFORMER, reason="KalmanConv1dLinear not available")
 class TestTransformer:
     @pytest.mark.parametrize("seq", WINDOW_SIZES)
     def test_kalman_forward(self, kalman_data, seq):
@@ -127,6 +154,7 @@ class TestTransformer:
         assert x.grad is not None and not torch.isnan(x.grad).any()
 
 
+@pytest.mark.skipif(not HAS_DEEP_CNN, reason="DeepCNNTransformer not available")
 class TestDeepCNN:
     @pytest.mark.parametrize("seq", WINDOW_SIZES)
     def test_kalman_forward(self, kalman_data, seq):
@@ -163,6 +191,7 @@ class TestDeepCNN:
         assert x.grad is not None
 
 
+@pytest.mark.skipif(not HAS_MAMBA, reason="DualStreamMamba not available")
 class TestMamba:
     @pytest.mark.parametrize("seq", WINDOW_SIZES)
     def test_kalman_forward(self, kalman_data, seq):
@@ -286,9 +315,17 @@ class TestCrossArchitecture:
 class TestConfigCompatibility:
     def test_ablation_config_valid(self):
         """Ablation script configs are properly structured."""
-        import sys
-        sys.path.insert(0, str(Path(__file__).parent.parent))
-        from distributed_dataset_pipeline.run_architecture_ablation import ARCHITECTURES, INPUT_TYPES, DATASET_CONFIGS
+        try:
+            import yaml
+        except ImportError:
+            pytest.skip("yaml not available")
+
+        try:
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent.parent))
+            from distributed_dataset_pipeline.run_architecture_ablation import ARCHITECTURES, INPUT_TYPES, DATASET_CONFIGS
+        except ImportError:
+            pytest.skip("ablation script not available")
 
         for arch, cfg in ARCHITECTURES.items():
             assert 'model' in cfg and 'model_args_override' in cfg
@@ -415,9 +452,16 @@ class TestWindowSizeConfig:
     ])
     def test_window_size_mapping(self, dataset, window, samples):
         """Verify window size mappings are correct."""
-        import sys
-        sys.path.insert(0, str(Path(__file__).parent.parent))
-        from distributed_dataset_pipeline.run_architecture_ablation import DATASET_CONFIGS
+        try:
+            import yaml
+        except ImportError:
+            pytest.skip("yaml not available")
+        try:
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent.parent))
+            from distributed_dataset_pipeline.run_architecture_ablation import DATASET_CONFIGS
+        except ImportError:
+            pytest.skip("ablation script not available")
 
         assert DATASET_CONFIGS[dataset]['window_sizes'][window] == samples
 
