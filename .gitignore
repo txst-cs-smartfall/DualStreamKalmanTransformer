@@ -42,20 +42,26 @@ distributed_dataset_pipeline/*.md
 *.out
 *.csv
 *.tex
+*.md
+!README.md
+!**/README.md
 
 # Legacy configs (not needed for publication)
 config/*
 !config/smartfallmm/
 !config/upfall/
 !config/wedafall/
+!config/best_config/
 config/smartfallmm/*
 config/upfall/*
 config/wedafall/*
+config/best_config/*
 !config/smartfallmm/kalman.yaml
 !config/upfall/kalman.yaml
 !config/upfall/raw.yaml
 !config/wedafall/kalman.yaml
 !config/wedafall/raw.yaml
+!config/best_config/**
 
 # Paper and docs (keep separate)
 paper/

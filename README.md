@@ -28,9 +28,9 @@ All results from Leave-One-Subject-Out (LOSO) cross-validation.
 
 | Dataset | Model | Test F1 | Accuracy | Precision | Recall | Config |
 |---------|-------|---------|----------|-----------|--------|--------|
-| **SmartFallMM** | KalmanConv1dLinear | **91.38%** ± 6.67 | 88.44% | 89.22% | 94.14% | [kalman.yaml](best_config/smartfallmm/kalman.yaml) |
-| **UP-FALL** | KalmanConv1dConv1d | **95.18%** | 96.53% | 95.21% | 95.55% | [kalman.yaml](best_config/upfall/kalman.yaml) |
-| **WEDA-FALL** | KalmanConv1dConv1d | **94.51%** ± 4.83 | 93.83% | 92.16% | 97.07% | [kalman.yaml](best_config/wedafall/kalman.yaml) |
+| **SmartFallMM** | KalmanConv1dLinear | **91.38%** ± 6.67 | 88.44% | 89.22% | 94.14% | [kalman.yaml](config/best_config/smartfallmm/kalman.yaml) |
+| **UP-FALL** | KalmanConv1dConv1d | **95.18%** | 96.53% | 95.21% | 95.55% | [kalman.yaml](config/best_config/upfall/kalman.yaml) |
+| **WEDA-FALL** | KalmanConv1dConv1d | **94.51%** ± 4.83 | 93.83% | 92.16% | 97.07% | [kalman.yaml](config/best_config/wedafall/kalman.yaml) |
 
 ### Dual-Stream + Kalman Improvement
 
@@ -81,7 +81,7 @@ make train
 make train-quick
 
 # Custom configuration
-python ray_train.py --config best_config/smartfallmm/kalman.yaml --num-gpus 8
+python ray_train.py --config config/best_config/smartfallmm/kalman.yaml --num-gpus 8
 ```
 
 ### Development
@@ -166,7 +166,7 @@ FusionTransformer/
 │
 ├── config/                          # Experiment configurations
 │   └── _base/                       # Inheritable base configs
-├── best_config/                     # Validated optimal configs
+├── config/best_config/                     # Validated optimal configs
 │
 ├── tests/                           # Test suite
 ├── Dockerfile                       # Container definition
@@ -182,19 +182,19 @@ FusionTransformer/
 
 ```bash
 # SmartFallMM (22 folds, ~2 hours on 8 GPUs)
-make train CONFIG=best_config/smartfallmm/kalman.yaml
+make train CONFIG=config/best_config/smartfallmm/kalman.yaml
 
 # UP-FALL (15 folds)
-make train CONFIG=best_config/upfall/kalman.yaml
+make train CONFIG=config/best_config/upfall/kalman.yaml
 
 # WEDA-FALL (12 folds)
-make train CONFIG=best_config/wedafall/kalman.yaml
+make train CONFIG=config/best_config/wedafall/kalman.yaml
 ```
 
 ### Resume Interrupted Training
 
 ```bash
-make train-resume CONFIG=best_config/smartfallmm/kalman.yaml
+make train-resume CONFIG=config/best_config/smartfallmm/kalman.yaml
 ```
 
 ### Architecture Ablation

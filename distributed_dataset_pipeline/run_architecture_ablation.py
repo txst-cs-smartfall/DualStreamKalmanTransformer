@@ -109,7 +109,7 @@ INPUT_TYPES = {
 # NOTE: SmartFallMM excluded - only UP-FALL and WEDA-FALL included
 DATASET_CONFIGS = {
     'upfall': {
-        'base_config': 'best_config/upfall/kalman.yaml',
+        'base_config': 'config/best_config/upfall/kalman.yaml',
         'sampling_rate': 18,
         'feeder': 'Feeder.external_datasets.ExternalFallDataset',
         'description': 'UP-FALL (18Hz, 17 subjects, wrist IMU)',
@@ -123,7 +123,7 @@ DATASET_CONFIGS = {
         'num_test_subjects': 15,
     },
     'wedafall': {
-        'base_config': 'best_config/wedafall/kalman.yaml',
+        'base_config': 'config/best_config/wedafall/kalman.yaml',
         'sampling_rate': 50,
         'feeder': 'Feeder.external_datasets.ExternalFallDataset',
         'description': 'WEDA-FALL (50Hz, young+elderly, wrist)',

@@ -135,7 +135,7 @@ ARCHITECTURES = {
 
 1. **Create loader** in `utils/` following the `UPFallLoader` or `WEDAFallLoader` pattern.
 
-2. **Create base config** at `best_config/{dataset}/kalman.yaml`.
+2. **Create base config** at `config/best_config/{dataset}/kalman.yaml`.
 
 3. **Register** in `run_architecture_ablation.py`:
 
@@ -143,7 +143,7 @@ ARCHITECTURES = {
 DATASET_CONFIGS = {
     # ...
     'mydataset': {
-        'base_config': 'best_config/mydataset/kalman.yaml',
+        'base_config': 'config/best_config/mydataset/kalman.yaml',
         'sampling_rate': 50,
         'window_sizes': {'2s': 100, '3s': 150, 'default': 200},
         'num_test_subjects': 15,
