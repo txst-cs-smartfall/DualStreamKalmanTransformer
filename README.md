@@ -166,7 +166,7 @@ FusionTransformer/
 │
 ├── config/                          # Experiment configurations
 │   └── _base/                       # Inheritable base configs
-├── config/best_config/                     # Validated optimal configs
+├── config/best_config/                     # Validated reference configs
 │
 ├── tests/                           # Test suite
 ├── Dockerfile                       # Container definition
@@ -214,7 +214,7 @@ make ablation-quick
 Configs use YAML with inheritance support:
 
 ```yaml
-# config/smartfallmm/kalman_optimal.yaml
+# config/best_config/smartfallmm/kalman.yaml
 _base:
   - _base/model/transformer_small.yaml
   - _base/training/default.yaml

@@ -115,7 +115,7 @@ class MultiKernelConv1DEncoder(nn.Module):
         x = rearrange(x, 'b t c -> b c t')
 
         features = [conv(x) for conv in self.convs]
-        x = torch.cat(features, dim=1)  # (B, C_out, T)
+        x = torch.cat(features, dim=1)
 
         x = self.norm(x)
         x = self.activation(x)
@@ -213,7 +213,7 @@ class KalmanEncoderAblation(nn.Module):
         self.imu_frames = imu_frames if imu_frames else acc_frames
         self.imu_channels = imu_channels if imu_channels else acc_coords
 
-        self.acc_channels = 4  # smv, ax, ay, az
+        self.acc_channels = 4
         self.ori_channels = self.imu_channels - 4
 
         acc_dim = int(embed_dim * acc_ratio)
