@@ -1,7 +1,10 @@
 """
-Configuration system with inheritance, validation, and ablation sweeps.
+Configuration system for FusionTransformer.
 
-See docs/CONFIG_SYSTEM.md for usage guide.
+Core modules:
+- loader: YAML loading with inheritance
+- ablation: Sweep and experiment generation
+- hydra_utils: Hydra/argparse conversion
 """
 
 from .hydra_utils import (
@@ -11,65 +14,58 @@ from .hydra_utils import (
     load_yaml_config,
     merge_configs,
 )
+
 from .loader import (
     load_config,
     validate_config,
     save_config,
+    resolve_model_class,
     ConfigLoadError,
     ConfigValidationError,
 )
 
-# Optional pydantic schema imports
-try:
-    from .schema import (
-        ExperimentConfig,
-        ModelConfig,
-        DatasetConfig,
-        PreprocessingConfig,
-        TrainingConfig,
-        ModuleToggles,
-        ExecutionConfig,
-    )
-    HAS_PYDANTIC = True
-except ImportError:
-    HAS_PYDANTIC = False
-    ExperimentConfig = None
-    ModelConfig = None
-    DatasetConfig = None
-    PreprocessingConfig = None
-    TrainingConfig = None
-    ModuleToggles = None
-    ExecutionConfig = None
-
 from .ablation import (
     AblationSpec,
+    AblationRunner,
     generate_configs,
     run_ablation,
 )
 
+from .registry import (
+    ARCHITECTURES,
+    DATASETS,
+    INPUT_TYPES,
+    STRIDES,
+    get_architecture,
+    get_dataset,
+    get_window_size,
+)
+
 __all__ = [
-    # Hydra utils
-    "hydra_to_namespace",
-    "flatten_config",
-    "config_to_yaml_str",
-    "load_yaml_config",
-    "merge_configs",
     # Loader
-    "load_config",
-    "validate_config",
-    "save_config",
-    "ConfigLoadError",
-    "ConfigValidationError",
-    # Schema (may be None if pydantic not available)
-    "ExperimentConfig",
-    "ModelConfig",
-    "DatasetConfig",
-    "PreprocessingConfig",
-    "TrainingConfig",
-    "ModuleToggles",
-    "ExecutionConfig",
+    'load_config',
+    'validate_config',
+    'save_config',
+    'resolve_model_class',
+    'ConfigLoadError',
+    'ConfigValidationError',
+    # Hydra utils
+    'hydra_to_namespace',
+    'flatten_config',
+    'config_to_yaml_str',
+    'load_yaml_config',
+    'merge_configs',
     # Ablation
-    "AblationSpec",
-    "generate_configs",
-    "run_ablation",
+    'AblationSpec',
+    'AblationRunner',
+    'generate_configs',
+    'run_ablation',
+    # Registry
+    'ARCHITECTURES',
+    'DATASETS',
+    'INPUT_TYPES',
+    'STRIDES',
+    'get_architecture',
+    'get_dataset',
+    'get_window_size',
 ]

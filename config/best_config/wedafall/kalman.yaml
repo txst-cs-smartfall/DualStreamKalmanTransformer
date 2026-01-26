@@ -1,7 +1,7 @@
 # WEDA-FALL: Optimal Kalman Configuration
-# Best F1: 94.51% ± 4.83% (12 LOSO folds)
-# Key: 6s window (300 samples at 50Hz), tight stride, dual-stream concat
-# Source: exps/wedafall_all_20260125_194802
+# Best F1: 95.41% ± 2.39% (12 LOSO folds)
+# Key: 5.5s window (275 samples at 50Hz) - largest Kalman advantage (+0.77%)
+# Source: exps/wedafall_elderly_ablation_20260120_160357/runs/kalman_5.5s_d04_e48
 
 model: Models.encoder_ablation.KalmanConv1dConv1d
 dataset: wedafall
@@ -10,15 +10,15 @@ subjects: [1,2,3,4,5,6,7,8,9,10,11,12,13,14]
 validation_subjects: [13, 14]
 
 model_args:
-  imu_frames: 300
+  imu_frames: 275
   imu_channels: 7
-  acc_frames: 300
+  acc_frames: 275
   acc_coords: 7
   num_classes: 1
   num_heads: 4
   num_layers: 2
   embed_dim: 48
-  dropout: 0.5
+  dropout: 0.4
   activation: relu
   norm_first: true
   se_reduction: 4
@@ -28,7 +28,7 @@ dataset_args:
   base_path: other_datasets/WEDA-FALL/dataset
   frequency: 50Hz
   mode: sliding_window
-  max_length: 300
+  max_length: 275
   task: fd
   stride: 32
   loss_type: focal
