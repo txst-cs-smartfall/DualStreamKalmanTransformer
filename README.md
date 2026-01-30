@@ -40,21 +40,6 @@ All results from Leave-One-Subject-Out (LOSO) cross-validation.
 | UP-FALL | 92.64% | **95.18%** | **+2.54%** |
 | WEDA-FALL | 94.64% | **95.41%** | **+0.77%** |
 
-### SmartFallMM Alternative Configurations
-
-Stride × Loss ablation results (2026-01-27). All with `KalmanConv1dConv1d`.
-
-| Stride (fall, ADL) | Loss | Kalman F1 | Raw F1 | Delta |
-|--------------------|------|-----------|--------|-------|
-| (8, 48) | bce | **92.80%** | 93.01% | -0.20 |
-| (8, 64) | focal | 92.77% | 92.82% | -0.05 |
-| (8, 64) | bce | 92.75% | 93.10% | -0.35 |
-| (8, 48) | focal | 92.63% | 92.83% | -0.20 |
-| (8, 40) | focal | 92.57% | 91.78% | +0.79 |
-| (8, 40) | bce | 92.53% | 91.30% | +1.24 |
-
-**Note**: Lower ADL stride (40-48) with BCE loss achieves competitive results.
-
 ---
 
 ## UP-FALL Ablation Study
